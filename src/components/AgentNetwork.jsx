@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Search, Filter, Mail, Key, Megaphone, Layout, BarChart2, Play, Loader } from 'lucide-react';
 import { SYSTEM_PROMPTS } from '../agents/systemPrompts';
-import { runAllAgents } from '../agents/orchestrator';
+import { runAllAgents, isDemoMode } from '../agents/orchestrator';
 import { supabase } from '../lib/supabase';
 import StatusDot from './StatusDot';
 import OutputPanel from './OutputPanel';
@@ -130,6 +130,19 @@ export default function AgentNetwork() {
         <h1 className="text-xl font-semibold text-gray-900 font-mono">Agent Network</h1>
         <p className="text-sm text-gray-500 mt-1 font-mono">7 specialists · 4 execution waves · synchronized context</p>
       </div>
+
+      {isDemoMode() && (
+        <div className="mb-5 flex items-start gap-3 border border-amber-200 bg-amber-50 rounded-xl px-4 py-3">
+          <span className="text-amber-500 font-mono text-sm mt-0.5">◈</span>
+          <div>
+            <div className="text-sm font-medium font-mono text-amber-800">Demo mode — sample outputs</div>
+            <div className="text-xs font-mono text-amber-600 mt-0.5">
+              No Anthropic API key detected. Agents will run with pre-built example outputs for roofing / Fairfax, VA.
+              Add <span className="font-semibold">VITE_ANTHROPIC_API_KEY</span> to .env to run live.
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Controls */}
       <div className="grid grid-cols-2 gap-3 mb-3">

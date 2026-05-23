@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Search, Loader } from 'lucide-react';
-import { callAgent } from '../agents/orchestrator';
+import { callAgent, isDemoMode } from '../agents/orchestrator';
 import { SYSTEM_PROMPTS } from '../agents/systemPrompts';
 import { supabase } from '../lib/supabase';
 import OutputPanel from './OutputPanel';
@@ -52,6 +52,19 @@ export default function ProspectFinder() {
         <h1 className="text-xl font-semibold text-gray-900 font-mono">Prospect Finder</h1>
         <p className="text-sm text-gray-500 mt-1 font-mono">Find and score lead gen client targets in any niche and location</p>
       </div>
+
+      {isDemoMode() && (
+        <div className="mb-5 flex items-start gap-3 border border-amber-200 bg-amber-50 rounded-xl px-4 py-3">
+          <span className="text-amber-500 font-mono text-sm mt-0.5">◈</span>
+          <div>
+            <div className="text-sm font-medium font-mono text-amber-800">Demo mode — sample output</div>
+            <div className="text-xs font-mono text-amber-600 mt-0.5">
+              Returns pre-built prospect list for roofing / Fairfax, VA regardless of inputs.
+              Add <span className="font-semibold">VITE_ANTHROPIC_API_KEY</span> to .env to search live.
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-2 gap-3 mb-4">
         <div>
