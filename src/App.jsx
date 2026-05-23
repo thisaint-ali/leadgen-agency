@@ -45,8 +45,11 @@ export default function App() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-white flex items-center justify-center">
-        <span className="text-xs font-mono text-gray-400">loading...</span>
+      <div className="min-h-screen bg-[#F1F5F9] flex items-center justify-center">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-8 h-8 border-2 border-[#2196F3] border-t-transparent rounded-full animate-spin" />
+          <span className="text-xs text-slate-400 font-medium">Loading AMA Leads…</span>
+        </div>
       </div>
     );
   }
@@ -58,9 +61,10 @@ export default function App() {
   const Page = PAGES[page] || Dashboard;
 
   return (
-    <div className="flex min-h-screen bg-white">
+    <div className="flex min-h-screen bg-[#F1F5F9]">
       <Sidebar current={page} onChange={setPage} />
-      <main className="flex-1 overflow-y-auto">
+      {/* pt-14 offsets the fixed mobile top bar; lg:pt-0 removes it on desktop */}
+      <main className="flex-1 overflow-y-auto pt-14 lg:pt-0">
         <Page onNavigate={setPage} />
       </main>
     </div>
