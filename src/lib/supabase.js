@@ -12,7 +12,8 @@ export function isSupabaseConfigured() {
     !!supabaseAnonKey &&
     supabaseUrl !== 'your_supabase_project_url_here' &&
     supabaseAnonKey !== 'your_supabase_anon_key_here' &&
-    supabaseUrl.startsWith('https://')
+    supabaseUrl.startsWith('https://') &&
+    (supabaseAnonKey.startsWith('eyJ') || supabaseAnonKey.startsWith('sb_'))
   );
 }
 
