@@ -1,9 +1,10 @@
 import { useState } from 'react';
-import { Search, Network, BookOpen, LayoutDashboard, History, LogOut, Menu, X, TrendingUp } from 'lucide-react';
+import { Search, Network, BookOpen, LayoutDashboard, History, LogOut, Menu, X, Briefcase } from 'lucide-react';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 
 const NAV = [
   { id: 'dashboard',  label: 'Dashboard',      icon: LayoutDashboard },
+  { id: 'pipeline',   label: 'Pipeline',        icon: Briefcase },
   { id: 'agents',     label: 'Agent Network',   icon: Network },
   { id: 'prospects',  label: 'Prospect Finder', icon: Search },
   { id: 'knowledge',  label: 'Knowledge Base',  icon: BookOpen },
