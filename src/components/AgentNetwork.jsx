@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Search, Filter, Mail, Key, Megaphone, Layout, BarChart2, Play, Loader } from 'lucide-react';
 import { SYSTEM_PROMPTS } from '../agents/systemPrompts';
 import { runAllAgents, isDemoMode } from '../agents/orchestrator';
-import { supabase } from '../lib/supabase';
+import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import StatusDot from './StatusDot';
 import OutputPanel from './OutputPanel';
 
@@ -79,12 +79,10 @@ export default function AgentNetwork() {
     setAgentState(initState());
     addLog('System initialized');
 
-    // Create run record in Supabase
-    const { data: runRow } = await supabase
-      .from('runs')
-      .insert({ niche, location, extra_context: extra || null, status: 'running' })
-      .select()
-      .single();
+    // Create run record in Supabase (only if configured)
+    const { data: runRow } = isSupabaseConfigured() && supabase
+      ? await supabase.from('runs').insert({ niche, location, extra_context: extra || null, status: 'running' }).select().single()
+      : { data: null };
 
     const runId = runRow?.id;
 
@@ -92,7 +90,7 @@ export default function AgentNetwork() {
 
     const wrappedStatusChange = (id, status, output = '', error = '') => {
       handleStatusChange(id, status, output, error);
-      if ((status === 'done' || status === 'error') && runId) {
+      if ((status === 'done' || status === 'error') && runId && isSupabaseConfigured() && supabase) {
         finalOutputs[id] = { status, output, error };
         supabase.from('agent_outputs').insert({
           run_id: runId,
@@ -112,7 +110,7 @@ export default function AgentNetwork() {
     );
 
     // Mark run complete
-    if (runId) {
+    if (runId && isSupabaseConfigured() && supabase) {
       const hasError = Object.values(finalOutputs).some(o => o.status === 'error');
       await supabase.from('runs').update({ status: hasError ? 'error' : 'complete' }).eq('id', runId);
     }

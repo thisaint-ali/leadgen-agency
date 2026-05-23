@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Search, Loader } from 'lucide-react';
 import { callAgent, isDemoMode } from '../agents/orchestrator';
 import { SYSTEM_PROMPTS } from '../agents/systemPrompts';
-import { supabase } from '../lib/supabase';
+import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import OutputPanel from './OutputPanel';
 
 const NICHES = [
@@ -36,8 +36,8 @@ export default function ProspectFinder() {
       }
     );
 
-    // Save to Supabase
-    if (finalOutput) {
+    // Save to Supabase (only if configured)
+    if (finalOutput && isSupabaseConfigured() && supabase) {
       await supabase.from('prospect_searches').insert({
         niche,
         location,

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { supabase } from './lib/supabase';
+import { supabase, isSupabaseConfigured } from './lib/supabase';
 import Sidebar from './components/Sidebar';
 import Dashboard from './pages/Dashboard';
 import Agents from './pages/Agents';
@@ -22,8 +22,17 @@ export default function App() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
+    // If Supabase isn't configured, skip auth entirely — go straight to app
+    if (!isSupabaseConfigured() || !supabase) {
+      setLoading(false);
+      setSession('no-auth');
+      return;
+    }
+
+    supabase.auth.getSession().then(({ data }) => {
+      setSession(data?.session ?? null);
+      setLoading(false);
+    }).catch(() => {
       setLoading(false);
     });
 

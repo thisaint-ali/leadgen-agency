@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { supabase } from '../lib/supabase';
+import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 import OutputPanel from '../components/OutputPanel';
 
@@ -123,6 +123,10 @@ export default function History() {
 
   useEffect(() => {
     const load = async () => {
+      if (!isSupabaseConfigured() || !supabase) {
+        setLoading(false);
+        return;
+      }
       const [{ data: r }, { data: s }] = await Promise.all([
         supabase.from('runs').select('*').order('created_at', { ascending: false }),
         supabase.from('prospect_searches').select('*').order('created_at', { ascending: false }),
@@ -154,6 +158,18 @@ export default function History() {
           </button>
         ))}
       </div>
+
+      {!isSupabaseConfigured() && (
+        <div className="flex items-start gap-3 border border-amber-200 bg-amber-50 rounded-xl px-4 py-3 mb-4">
+          <span className="text-amber-500 font-mono text-sm mt-0.5">◈</span>
+          <div>
+            <div className="text-sm font-medium font-mono text-amber-800">Supabase not connected</div>
+            <div className="text-xs font-mono text-amber-600 mt-0.5">
+              History requires Supabase. Add <span className="font-semibold">VITE_SUPABASE_URL</span> and <span className="font-semibold">VITE_SUPABASE_ANON_KEY</span> to your environment variables.
+            </div>
+          </div>
+        </div>
+      )}
 
       {loading && <div className="text-xs font-mono text-gray-400">loading...</div>}
 

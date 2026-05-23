@@ -1,5 +1,5 @@
 import { Search, Network, BookOpen, LayoutDashboard, History, LogOut } from 'lucide-react';
-import { supabase } from '../lib/supabase';
+import { supabase, isSupabaseConfigured } from '../lib/supabase';
 
 const NAV = [
   { id: 'dashboard',  label: 'Dashboard',      icon: LayoutDashboard },
@@ -11,7 +11,9 @@ const NAV = [
 
 export default function Sidebar({ current, onChange }) {
   const handleLogout = async () => {
-    await supabase.auth.signOut();
+    if (isSupabaseConfigured() && supabase) {
+      await supabase.auth.signOut();
+    }
   };
 
   return (
