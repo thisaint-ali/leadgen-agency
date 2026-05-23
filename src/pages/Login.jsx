@@ -24,8 +24,8 @@ export default function Login() {
     <div className="min-h-screen bg-white flex items-center justify-center">
       <div className="w-full max-w-sm px-6">
         <div className="mb-8">
-          <div className="text-lg font-semibold font-mono text-gray-900">LeadGen OS</div>
-          <div className="text-xs font-mono text-gray-400 mt-0.5">amaleads.org — owner access</div>
+          <div className="text-lg font-semibold font-mono text-gray-900">AMALeadx</div>
+          <div className="text-xs font-mono text-gray-400 mt-0.5">amaleadx — owner access</div>
         </div>
 
         <form onSubmit={handleLogin} className="space-y-3">

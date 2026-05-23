@@ -19,8 +19,8 @@ export default function Sidebar({ current, onChange }) {
   return (
     <div className="w-52 min-h-screen border-r border-gray-100 bg-white flex flex-col py-6 px-3">
       <div className="px-3 mb-8">
-        <div className="text-sm font-semibold font-mono text-gray-900">LeadGen OS</div>
-        <div className="text-xs text-gray-400 font-mono mt-0.5">amaleads.org</div>
+        <div className="text-sm font-semibold font-mono text-gray-900">AMALeadx</div>
+        <div className="text-xs text-gray-400 font-mono mt-0.5">amaleadx.vercel.app</div>
       </div>
 
       <nav className="space-y-0.5 flex-1">

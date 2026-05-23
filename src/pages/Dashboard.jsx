@@ -20,7 +20,7 @@ export default function Dashboard({ onNavigate }) {
 
       <div className="mb-8">
 
-        <h1 className="text-2xl font-semibold font-mono text-gray-900">LeadGen OS</h1>
+        <h1 className="text-2xl font-semibold font-mono text-gray-900">AMALeadx</h1>
 
         <p className="text-gray-500 font-mono text-sm mt-1">Google Ads lead generation agency — Fairfax, VA</p>
 
