@@ -2,29 +2,9 @@ import { useState } from 'react';
 import { supabase } from '../lib/supabase';
 
 function AMALeadsLogo({ size = 'md' }) {
-  const sz = size === 'lg' ? 48 : 36;
-  const textSz = size === 'lg' ? 'text-xl' : 'text-base';
-  const subSz = size === 'lg' ? 'text-xs' : 'text-[10px]';
+  const h = size === 'lg' ? 'h-14' : 'h-10';
   return (
-    <div className="flex items-center gap-3">
-      <div className={`relative flex-shrink-0`} style={{ width: sz, height: sz }}>
-        <svg viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-full">
-          <path d="M18 2L32 7.5V18C32 27 25 33.5 18 36C11 33.5 4 27 4 18V7.5L18 2Z"
-            fill="#1B3A5C" stroke="#2196F3" strokeWidth="1.5"/>
-          <rect x="8"  y="22" width="4" height="7" rx="1" fill="#2196F3"/>
-          <rect x="14" y="17" width="4" height="12" rx="1" fill="#2196F3"/>
-          <rect x="20" y="20" width="4" height="9" rx="1" fill="#2196F3"/>
-          <path d="M16 13L26 9L22 19" fill="#F97316"/>
-        </svg>
-      </div>
-      <div className="leading-none">
-        <div>
-          <span className={`font-bold ${textSz} tracking-wide text-slate-900`}>AMA</span>
-          <span className={`font-bold ${textSz} tracking-wide text-[#2196F3]`}> Leads</span>
-        </div>
-        <div className={`text-slate-400 ${subSz} font-medium tracking-widest uppercase mt-0.5`}>Agency OS</div>
-      </div>
-    </div>
+    <img src="/logo.png" alt="AMA Leads" className={`${h} w-auto object-contain`} />
   );
 }
 

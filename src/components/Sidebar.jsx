@@ -14,26 +14,7 @@ const NAV = [
 function AMALeadsLogo() {
   return (
     <div className="flex items-center gap-2.5">
-      {/* Icon mark */}
-      <div className="relative w-9 h-9 flex-shrink-0">
-        <svg viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-full">
-          {/* Shield / pin shape */}
-          <path d="M18 2L32 7.5V18C32 27 25 33.5 18 36C11 33.5 4 27 4 18V7.5L18 2Z"
-            fill="#1B3A5C" stroke="#2196F3" strokeWidth="1.5"/>
-          {/* Bar charts */}
-          <rect x="8"  y="22" width="4" height="7" rx="1" fill="#2196F3"/>
-          <rect x="14" y="17" width="4" height="12" rx="1" fill="#2196F3"/>
-          <rect x="20" y="20" width="4" height="9" rx="1" fill="#2196F3"/>
-          {/* Arrow */}
-          <path d="M16 13L26 9L22 19" fill="#F97316"/>
-        </svg>
-      </div>
-      {/* Wordmark */}
-      <div className="leading-none">
-        <span className="text-white font-bold text-base tracking-wide">AMA</span>
-        <span className="text-[#2196F3] font-bold text-base tracking-wide"> Leads</span>
-        <div className="text-slate-400 text-[10px] font-medium tracking-widest uppercase mt-0.5">Agency OS</div>
-      </div>
+      <img src="/logo.png" alt="AMA Leads" className="h-9 w-auto object-contain flex-shrink-0" />
     </div>
   );
 }
