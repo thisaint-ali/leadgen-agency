@@ -41,7 +41,7 @@ create table prospects (
   phone text,
   website text,
   niche text default 'roofing contractors',
-  location text default 'Fairfax, VA',
+  location text,
   status text default 'new',   -- new | contacted | replied | call_booked | proposal | client | dead
   notes text,
   monthly_value integer,       -- retainer value once they become a client

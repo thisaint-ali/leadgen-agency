@@ -54,7 +54,7 @@ amaleads.org`;
 // ─── Blank form ────────────────────────────────────────────────────────────────
 const BLANK = {
   company_name: '', contact_name: '', email: '', phone: '',
-  website: '', niche: 'roofing contractors', location: 'Fairfax, VA',
+  website: '', niche: 'roofing contractors', location: '',
   notes: '', monthly_value: '',
 };
 

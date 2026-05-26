@@ -37,7 +37,7 @@ export default function Login() {
               style={{ color: 'rgba(148,163,184,0.8)' }}
               className="text-xs mt-4 tracking-wide"
             >
-              Northern Virginia · Fairfax, VA
+              Agency OS · amaleads.org
             </div>
           </div>
 

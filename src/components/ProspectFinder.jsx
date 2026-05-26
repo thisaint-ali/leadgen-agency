@@ -13,7 +13,7 @@ const NICHES = [
 
 export default function ProspectFinder() {
   const [niche, setNiche] = useState('roofing contractors');
-  const [location, setLocation] = useState('Fairfax, VA');
+  const [location, setLocation] = useState('');
   const [status, setStatus] = useState('idle');
   const [output, setOutput] = useState('');
   const [error, setError] = useState('');

@@ -41,7 +41,7 @@ const initState = () =>
 
 export default function AgentNetwork() {
   const [niche, setNiche] = useState('roofing contractors');
-  const [location, setLocation] = useState('Fairfax, VA');
+  const [location, setLocation] = useState('');
   const [extra, setExtra] = useState('');
   const [agentState, setAgentState] = useState(initState());
   const [log, setLog] = useState([]);
