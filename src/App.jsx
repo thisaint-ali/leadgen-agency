@@ -7,15 +7,19 @@ import Prospects from './pages/Prospects';
 import Knowledge from './pages/Knowledge';
 import History from './pages/History';
 import Pipeline from './pages/Pipeline';
+import MasterAgent from './pages/MasterAgent';
+import Integrations from './pages/Integrations';
 import Login from './pages/Login';
 
 const PAGES = {
-  dashboard: Dashboard,
-  pipeline: Pipeline,
-  agents: Agents,
-  prospects: Prospects,
-  knowledge: Knowledge,
-  history: History,
+  dashboard:    Dashboard,
+  master:       MasterAgent,
+  pipeline:     Pipeline,
+  agents:       Agents,
+  prospects:    Prospects,
+  integrations: Integrations,
+  knowledge:    Knowledge,
+  history:      History,
 };
 
 export default function App() {

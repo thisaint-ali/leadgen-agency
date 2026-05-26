@@ -2,8 +2,9 @@ import { useState, useEffect, useCallback } from 'react';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import {
   Plus, Mail, Phone, Globe, ChevronRight, Loader,
-  AlertTriangle, X, Users, DollarSign, TrendingUp, Check,
+  AlertTriangle, X, Users, DollarSign, TrendingUp, Check, Zap,
 } from 'lucide-react';
+import CampaignBuilder from '../components/CampaignBuilder';
 
 // ─── Stage config ──────────────────────────────────────────────────────────────
 const STAGES = [
@@ -166,9 +167,17 @@ function ProspectCard({ p, stage, onMove, onDelete, moving }) {
             </button>
           )}
           {!stage?.next && (
-            <span className="flex items-center gap-1 text-xs text-emerald-600 font-medium">
-              <Check size={12} /> Active client
-            </span>
+            <div className="flex items-center gap-2">
+              <span className="flex items-center gap-1 text-xs text-emerald-600 font-medium">
+                <Check size={12} /> Active client
+              </span>
+              <button
+                onClick={() => p && window.dispatchEvent(new CustomEvent('buildCampaign', { detail: p }))}
+                className="flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-lg bg-[#1B3A5C] text-white hover:bg-[#243E6A] transition-colors"
+              >
+                <Zap size={10} /> Build Campaign
+              </button>
+            </div>
           )}
         </div>
       </div>
@@ -185,6 +194,7 @@ export default function Pipeline() {
   const [form, setForm] = useState(BLANK);
   const [saving, setSaving] = useState(false);
   const [movingId, setMovingId] = useState(null);
+  const [newClient, setNewClient] = useState(null); // triggers CampaignBuilder
 
   const load = useCallback(async () => {
     if (!isSupabaseConfigured() || !supabase) { setLoading(false); return; }
@@ -197,6 +207,13 @@ export default function Pipeline() {
   }, []);
 
   useEffect(() => { load(); }, [load]);
+
+  // Listen for "Build Campaign" from client card buttons
+  useEffect(() => {
+    const handler = (e) => setNewClient(e.detail);
+    window.addEventListener('buildCampaign', handler);
+    return () => window.removeEventListener('buildCampaign', handler);
+  }, []);
 
   const addProspect = async (e) => {
     e.preventDefault();
@@ -223,6 +240,12 @@ export default function Pipeline() {
     await supabase.from('prospects').update(patch).eq('id', id);
     setProspects(p => p.map(x => x.id === id ? { ...x, ...patch } : x));
     setMovingId(null);
+
+    // When a prospect becomes a client, auto-trigger campaign build
+    if (nextStatus === 'client') {
+      const prospect = prospects.find(p => p.id === id);
+      if (prospect) setNewClient({ ...prospect, ...patch });
+    }
   };
 
   const deleteProspect = async (id) => {
@@ -356,6 +379,15 @@ export default function Pipeline() {
           />
         ))}
       </div>
+
+      {/* ── Campaign Builder ─────────────────────────────────────────────────── */}
+      {newClient && (
+        <CampaignBuilder
+          prospect={newClient}
+          onClose={() => setNewClient(null)}
+          onComplete={() => {}}
+        />
+      )}
 
       {/* ── Add prospect modal ───────────────────────────────────────────────── */}
       {showAdd && (

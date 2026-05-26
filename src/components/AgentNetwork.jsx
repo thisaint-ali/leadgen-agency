@@ -1,5 +1,7 @@
 import { useState } from 'react';
-import { Search, Filter, Mail, Key, Megaphone, Layout, BarChart2, Play, Loader, AlertTriangle } from 'lucide-react';
+import { Search, Filter, Mail, Key, Megaphone, Layout, BarChart2, Play, Loader, AlertTriangle, Download, CheckCircle2 } from 'lucide-react';
+import CitySearch from './CitySearch';
+import { importProspectsFromAgent1 } from '../agents/autoImport';
 import { SYSTEM_PROMPTS } from '../agents/systemPrompts';
 import { runAllAgents, isDemoMode } from '../agents/orchestrator';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
@@ -48,6 +50,8 @@ export default function AgentNetwork() {
   const [expanded, setExpanded] = useState(null);
   const [running, setRunning] = useState(false);
   const [finished, setFinished] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [importResult, setImportResult] = useState(null);
 
   const addLog = (msg) => setLog(p => [...p, {
     t: new Date().toLocaleTimeString('en-US', { hour12: false }),
@@ -110,6 +114,20 @@ export default function AgentNetwork() {
   const completedCount = Object.values(agentState).filter(a => a.status === 'done').length;
   const errorCount    = Object.values(agentState).filter(a => a.status === 'error').length;
 
+  const handleImport = async () => {
+    const agent1Output = agentState[1]?.output;
+    if (!agent1Output) return;
+    setImporting(true);
+    setImportResult(null);
+    const result = await importProspectsFromAgent1(agent1Output, {
+      niche,
+      location,
+      supabase: isSupabaseConfigured() ? supabase : null,
+    });
+    setImportResult(result);
+    setImporting(false);
+  };
+
   const inputClass = "w-full text-sm border border-slate-200 rounded-lg px-3 py-2.5 bg-white text-slate-900 placeholder-slate-300 focus:outline-none focus:ring-2 focus:ring-[#2196F3]/30 focus:border-[#2196F3] transition-colors disabled:opacity-50 disabled:bg-slate-50";
 
   return (
@@ -153,11 +171,10 @@ export default function AgentNetwork() {
           </div>
           <div>
             <label className="block text-xs font-medium text-slate-500 mb-1.5">Location</label>
-            <input
+            <CitySearch
               value={location}
-              onChange={e => setLocation(e.target.value)}
+              onChange={setLocation}
               disabled={running}
-              className={inputClass}
             />
           </div>
         </div>
@@ -273,6 +290,37 @@ export default function AgentNetwork() {
           </div>
         ))}
       </div>
+
+      {/* Auto-import banner */}
+      {finished && agentState[1]?.status === 'done' && (
+        <div className="mt-4 bg-white rounded-xl border border-slate-200 shadow-sm p-4 flex items-center justify-between gap-4">
+          <div>
+            <div className="text-sm font-semibold text-slate-800">Import prospects to Pipeline</div>
+            <div className="text-xs text-slate-400 mt-0.5">
+              Agent 1 found prospects — parse and add them to your CRM automatically
+            </div>
+          </div>
+          {importResult ? (
+            <div className="flex items-center gap-2 flex-shrink-0">
+              {importResult.imported > 0
+                ? <span className="flex items-center gap-1.5 text-sm font-semibold text-emerald-600"><CheckCircle2 size={14} /> {importResult.imported} imported</span>
+                : <span className="text-xs text-red-500">{importResult.error || 'None found'}</span>
+              }
+            </div>
+          ) : (
+            <button
+              onClick={handleImport}
+              disabled={importing}
+              className="flex-shrink-0 flex items-center gap-2 h-9 px-4 rounded-lg bg-[#1B3A5C] text-white text-sm font-medium hover:bg-[#243E6A] transition-colors disabled:opacity-50"
+            >
+              {importing
+                ? <><Loader size={13} className="animate-spin" /> Importing…</>
+                : <><Download size={13} /> Import to Pipeline</>
+              }
+            </button>
+          )}
+        </div>
+      )}
 
       {/* Activity log */}
       {log.length > 0 && (

@@ -1,14 +1,17 @@
 import { useState } from 'react';
-import { Search, Network, BookOpen, LayoutDashboard, History, LogOut, Menu, X, Briefcase } from 'lucide-react';
+import { Search, Network, BookOpen, LayoutDashboard, History, LogOut, Menu, X, Briefcase, Bot, Plug } from 'lucide-react';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
+import { getConnectedCount } from '../integrations/index';
 
 const NAV = [
-  { id: 'dashboard',  label: 'Dashboard',      icon: LayoutDashboard },
-  { id: 'pipeline',   label: 'Pipeline',        icon: Briefcase },
-  { id: 'agents',     label: 'Agent Network',   icon: Network },
-  { id: 'prospects',  label: 'Prospect Finder', icon: Search },
-  { id: 'knowledge',  label: 'Knowledge Base',  icon: BookOpen },
-  { id: 'history',    label: 'History',         icon: History },
+  { id: 'dashboard',     label: 'Dashboard',      icon: LayoutDashboard },
+  { id: 'master',        label: 'Master Agent',    icon: Bot },
+  { id: 'pipeline',      label: 'Pipeline',        icon: Briefcase },
+  { id: 'agents',        label: 'Agent Network',   icon: Network },
+  { id: 'prospects',     label: 'Prospect Finder', icon: Search },
+  { id: 'integrations',  label: 'Integrations',    icon: Plug },
+  { id: 'knowledge',     label: 'Knowledge Base',  icon: BookOpen },
+  { id: 'history',       label: 'History',         icon: History },
 ];
 
 function AMALeadsLogo() {
@@ -28,6 +31,8 @@ export default function Sidebar({ current, onChange }) {
     }
   };
 
+  const connectedCount = getConnectedCount();
+
   const NavItems = () => (
     <nav className="space-y-0.5 flex-1 px-3">
       {NAV.map(({ id, label, icon: Icon }) => {
@@ -43,7 +48,17 @@ export default function Sidebar({ current, onChange }) {
             }`}
           >
             <Icon size={16} className={active ? 'text-white' : 'text-slate-400'} />
-            {label}
+            <span className="flex-1">{label}</span>
+            {id === 'integrations' && (
+              <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
+                active ? 'bg-white/20 text-white' : connectedCount === 4 ? 'bg-emerald-500/20 text-emerald-400' : 'bg-[#243E6A] text-slate-400'
+              }`}>
+                {connectedCount}/4
+              </span>
+            )}
+            {id === 'master' && (
+              <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${active ? 'bg-white' : 'bg-emerald-400'}`} />
+            )}
           </button>
         );
       })}
