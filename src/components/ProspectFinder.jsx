@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Search, Loader, AlertTriangle } from 'lucide-react';
+import CitySearch from './CitySearch';
 import { callAgent, isDemoMode } from '../agents/orchestrator';
 import { SYSTEM_PROMPTS } from '../agents/systemPrompts';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
@@ -81,11 +82,10 @@ export default function ProspectFinder() {
           </div>
           <div>
             <label className="block text-xs font-medium text-slate-500 mb-1.5">Location</label>
-            <input
+            <CitySearch
               value={location}
-              onChange={e => setLocation(e.target.value)}
+              onChange={setLocation}
               disabled={status === 'running'}
-              className={inputClass}
             />
           </div>
         </div>

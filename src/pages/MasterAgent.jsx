@@ -175,8 +175,8 @@ export default function MasterAgent() {
       // Persist conversation
       if (isSupabaseConfigured() && supabase && fullContent) {
         supabase.from('master_conversations').insert([
-          { role: 'user',      content: userMsg },
-          { role: 'assistant', content: fullContent },
+          { msg_role: 'user',      content: userMsg },
+          { msg_role: 'assistant', content: fullContent },
         ]).then(() => {});
       }
     } catch (err) {

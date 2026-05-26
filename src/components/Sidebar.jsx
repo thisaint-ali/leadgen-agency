@@ -1,17 +1,20 @@
 import { useState } from 'react';
-import { Search, Network, BookOpen, LayoutDashboard, History, LogOut, Menu, X, Briefcase, Bot, Plug } from 'lucide-react';
+import { Search, Network, BookOpen, LayoutDashboard, History, LogOut, Menu, X, Briefcase, Bot, Plug, Cpu, FileText, BarChart2 } from 'lucide-react';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { getConnectedCount } from '../integrations/index';
 
 const NAV = [
-  { id: 'dashboard',     label: 'Dashboard',      icon: LayoutDashboard },
-  { id: 'master',        label: 'Master Agent',    icon: Bot },
-  { id: 'pipeline',      label: 'Pipeline',        icon: Briefcase },
-  { id: 'agents',        label: 'Agent Network',   icon: Network },
-  { id: 'prospects',     label: 'Prospect Finder', icon: Search },
-  { id: 'integrations',  label: 'Integrations',    icon: Plug },
-  { id: 'knowledge',     label: 'Knowledge Base',  icon: BookOpen },
-  { id: 'history',       label: 'History',         icon: History },
+  { id: 'dashboard',     label: 'Dashboard',        icon: LayoutDashboard },
+  { id: 'bigbot',        label: 'Big Bot',           icon: Cpu },
+  { id: 'master',        label: 'Master Agent',      icon: Bot },
+  { id: 'pipeline',      label: 'Pipeline',          icon: Briefcase },
+  { id: 'contracts',     label: 'Contracts',         icon: FileText },
+  { id: 'performance',   label: 'Performance',       icon: BarChart2 },
+  { id: 'agents',        label: 'Agent Network',     icon: Network },
+  { id: 'prospects',     label: 'Prospect Finder',   icon: Search },
+  { id: 'integrations',  label: 'Integrations',      icon: Plug },
+  { id: 'knowledge',     label: 'Knowledge Base',    icon: BookOpen },
+  { id: 'history',       label: 'History',           icon: History },
 ];
 
 function AMALeadsLogo() {
@@ -59,6 +62,9 @@ export default function Sidebar({ current, onChange }) {
             {id === 'master' && (
               <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${active ? 'bg-white' : 'bg-emerald-400'}`} />
             )}
+            {id === 'bigbot' && (
+              <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 animate-pulse ${active ? 'bg-white' : 'bg-[#2196F3]'}`} />
+            )}
           </button>
         );
       })}
@@ -84,7 +90,7 @@ export default function Sidebar({ current, onChange }) {
       )}
 
       {/* Mobile drawer */}
-      <div className={`lg:hidden fixed top-0 left-0 h-full w-72 bg-[#1B3A5C] z-50 flex flex-col transition-transform duration-300 ${mobileOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+      <div className={`lg:hidden fixed top-0 left-0 h-full w-72 bg-[#1B3A5C] z-50 flex flex-col transition-transform duration-300 ${mobileOpen ? 'translate-x-0' : '-translate-x-full pointer-events-none'}`}>
         <div className="flex items-center justify-between p-4 border-b border-[#243E6A]">
           <AMALeadsLogo />
           <button onClick={() => setMobileOpen(false)} className="text-slate-400 hover:text-white">
@@ -106,7 +112,7 @@ export default function Sidebar({ current, onChange }) {
       </div>
 
       {/* Desktop sidebar */}
-      <div className="hidden lg:flex w-64 min-h-screen bg-[#1B3A5C] flex-col flex-shrink-0">
+      <div className="hidden lg:flex w-64 h-full bg-[#1B3A5C] flex-col flex-shrink-0">
         <div className="p-4 border-b border-[#243E6A]">
           <AMALeadsLogo />
         </div>

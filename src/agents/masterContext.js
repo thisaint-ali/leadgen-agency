@@ -125,9 +125,10 @@ export function buildMasterSystemPrompt(ctx) {
   const projectedNewClients = Math.round(hotLeads * 0.5); // 50% close on call_booked+proposal
   const projectedMrrGrowth  = projectedNewClients * avgRetainer;
 
+  const ENV_KEYS = { anthropic: 'VITE_ANTHROPIC_API_KEY', resend: 'VITE_RESEND_API_KEY', googleAds: 'VITE_GOOGLE_ADS_KEY', ghl: 'VITE_GHL_API_KEY' };
   const intLine = (key, label) => {
     const on = integrations[key];
-    return `  ${on ? '✅' : '❌'} ${label}${!on ? ` — add ${Object.entries({ anthropic: 'VITE_ANTHROPIC_API_KEY', resend: 'VITE_RESEND_API_KEY', googleAds: 'VITE_GOOGLE_ADS_KEY', ghl: 'VITE_GHL_API_KEY' })[Object.keys(integrations).indexOf(key)]?.[1] || ''} to .env` : ''}`;
+    return `  ${on ? '✅' : '❌'} ${label}${!on ? ` — add ${ENV_KEYS[key]} to .env` : ''}`;
   };
 
   const agentLines = Object.values(agents.stats).length
