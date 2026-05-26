@@ -342,8 +342,21 @@ export default function AgentNetwork() {
     const context = demandState[id]?.context;
     setDemandState(p => ({ ...p, [id]: { ...p[id], status: 'running', output: '', error: '' } }));
 
-    const onStatus = (agentId, status, output = '', error = '') => {
+    const onStatus = async (agentId, status, output = '', error = '') => {
       setDemandState(p => ({ ...p, [agentId]: { ...p[agentId], status, output, error } }));
+      // Auto-save A17 (Competitor Monitor) outputs to agent_templates
+      if (agentId === 17 && status === 'done' && output && isSupabaseConfigured() && supabase) {
+        const nicheMatch    = context?.match(/niche:\s*([^\n]+)/i);
+        const locationMatch = context?.match(/location:\s*([^\n]+)/i);
+        await supabase.from('agent_templates').insert({
+          agent_id:   17,
+          agent_name: 'Competitor Monitor',
+          name:       `Competitor Monitor — ${new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`,
+          content:    output,
+          niche:    nicheMatch?.[1]?.trim()    || niche    || null,
+          location: locationMatch?.[1]?.trim() || location || null,
+        });
+      }
     };
 
     const userMsg = context?.trim()

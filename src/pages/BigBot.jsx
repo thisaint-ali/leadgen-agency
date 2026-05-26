@@ -1,9 +1,141 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Bot, Play, RefreshCw, AlertTriangle, CheckCircle2, Clock, Zap,
          ChevronRight, X, TrendingUp, Mail, Shield, Cpu, BarChart2, Loader,
-         FileText, PenLine, BarChart, Repeat, Settings, ToggleLeft, ToggleRight } from 'lucide-react';
+         FileText, PenLine, BarChart, Repeat, Settings, ToggleLeft, ToggleRight,
+         Bell, BellOff, Eye, ChevronDown, ChevronUp, Copy } from 'lucide-react';
 import { runBigBot, getBigBotStatus, dismissInsight, markApplied } from '../agents/bigBotEngine';
 import { isSupabaseConfigured, supabase } from '../lib/supabase';
+
+// ─── Browser notification helpers ────────────────────────────────────────────
+function canNotify() {
+  return 'Notification' in window;
+}
+function notifyGranted() {
+  return canNotify() && Notification.permission === 'granted';
+}
+async function requestNotifyPermission() {
+  if (!canNotify()) return false;
+  if (Notification.permission === 'granted') return true;
+  if (Notification.permission === 'denied') return false;
+  const result = await Notification.requestPermission();
+  return result === 'granted';
+}
+function fireNotification(title, body, url = '/') {
+  if (!notifyGranted()) return;
+  const n = new Notification(title, {
+    body,
+    icon: '/logo.png',
+    badge: '/logo.png',
+    tag: 'bigbot-urgent',
+    renotify: true,
+  });
+  n.onclick = () => { window.focus(); n.close(); };
+}
+
+// ─── Competitor Intel Panel ───────────────────────────────────────────────────
+function CompetitorIntelPanel() {
+  const [reports,  setReports]  = useState([]);
+  const [loading,  setLoading]  = useState(true);
+  const [expanded, setExpanded] = useState(null);
+  const [copied,   setCopied]   = useState(null);
+
+  useEffect(() => {
+    if (!isSupabaseConfigured() || !supabase) { setLoading(false); return; }
+    supabase
+      .from('agent_templates')
+      .select('*')
+      .eq('agent_id', 17)
+      .order('created_at', { ascending: false })
+      .limit(20)
+      .then(({ data }) => { setReports(data || []); setLoading(false); });
+  }, []);
+
+  const handleCopy = (id, content) => {
+    navigator.clipboard?.writeText(content);
+    setCopied(id);
+    setTimeout(() => setCopied(null), 1800);
+  };
+
+  const handleDelete = async (id) => {
+    if (!supabase) return;
+    await supabase.from('agent_templates').delete().eq('id', id);
+    setReports(prev => prev.filter(r => r.id !== id));
+    if (expanded === id) setExpanded(null);
+  };
+
+  if (!isSupabaseConfigured()) return null;
+
+  return (
+    <div className="mb-5">
+      <div className="flex items-center gap-3 mb-3">
+        <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Competitor Intel</h2>
+        <div className="flex-1 h-px bg-slate-200" />
+        <span className="text-xs text-slate-300">A17 · saved reports</span>
+      </div>
+
+      {loading ? (
+        <div className="flex items-center gap-2 text-xs text-slate-400 py-2">
+          <Loader size={11} className="animate-spin" /> Loading…
+        </div>
+      ) : reports.length === 0 ? (
+        <div className="bg-white rounded-xl border border-slate-200 shadow-sm px-4 py-5 text-center">
+          <Eye size={22} className="mx-auto text-slate-200 mb-2" />
+          <div className="text-sm font-medium text-slate-500">No intel reports yet</div>
+          <div className="text-xs text-slate-400 mt-1">
+            Run Agent 17 (Competitor Monitor) from Agent Network and click <strong>⭐ Save template</strong> — reports appear here automatically.
+          </div>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {reports.map(r => (
+            <div key={r.id} className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+              {/* Header */}
+              <div
+                className="flex items-center justify-between px-4 py-3 cursor-pointer hover:bg-slate-50 transition-colors"
+                onClick={() => setExpanded(expanded === r.id ? null : r.id)}
+              >
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-bold text-purple-600 bg-purple-50 border border-purple-200 px-1.5 py-0.5 rounded-full">A17</span>
+                    <span className="text-sm font-semibold text-slate-800 truncate">{r.niche || 'Competitor report'}</span>
+                    {r.location && <span className="text-xs text-slate-400 truncate hidden sm:inline">· {r.location}</span>}
+                  </div>
+                  <div className="text-[10px] text-slate-400 mt-0.5">
+                    {new Date(r.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 flex-shrink-0 ml-3">
+                  <button
+                    onClick={e => { e.stopPropagation(); handleCopy(r.id, r.content); }}
+                    className="text-xs text-slate-400 hover:text-[#2196F3] transition-colors px-2 py-1"
+                  >
+                    {copied === r.id ? '✓ Copied' : <Copy size={11} />}
+                  </button>
+                  <button
+                    onClick={e => { e.stopPropagation(); handleDelete(r.id); }}
+                    className="text-xs text-slate-300 hover:text-red-400 transition-colors px-1"
+                  >
+                    <X size={11} />
+                  </button>
+                  {expanded === r.id ? <ChevronUp size={13} className="text-slate-400" /> : <ChevronDown size={13} className="text-slate-400" />}
+                </div>
+              </div>
+
+              {/* Body */}
+              {expanded === r.id && (
+                <div className="border-t border-slate-100 px-4 py-3 bg-slate-50">
+                  <pre className="text-xs text-slate-700 font-mono whitespace-pre-wrap leading-relaxed max-h-80 overflow-y-auto">
+                    {r.content}
+                  </pre>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 const API_KEY = import.meta.env.VITE_ANTHROPIC_API_KEY;
 const DEMO_MODE = !API_KEY || API_KEY === 'your_anthropic_key_here';
@@ -213,12 +345,13 @@ function InsightCard({ insight, onDismiss, onApply }) {
 }
 
 export default function BigBot() {
-  const [status, setStatus]           = useState(null);   // { lastRun, insights }
+  const [status, setStatus]           = useState(null);
   const [running, setRunning]         = useState(false);
   const [progress, setProgress]       = useState([]);
   const [filter, setFilter]           = useState('All');
   const [localInsights, setLocalInsights] = useState([]);
   const [loadingStatus, setLoadingStatus] = useState(true);
+  const [notifyPerm, setNotifyPerm]   = useState(canNotify() ? Notification.permission : 'unsupported');
   const autoRanRef = useRef(false);
   const bottomRef  = useRef(null);
 
@@ -229,6 +362,15 @@ export default function BigBot() {
     setLocalInsights(s?.insights || []);
     setLoadingStatus(false);
     return s;
+  }, []);
+
+  // Request notification permission on first mount (non-blocking)
+  useEffect(() => {
+    if (canNotify() && Notification.permission === 'default') {
+      requestNotifyPermission().then(granted => {
+        setNotifyPerm(granted ? 'granted' : 'denied');
+      });
+    }
   }, []);
 
   useEffect(() => {
@@ -256,9 +398,23 @@ export default function BigBot() {
     if (error) {
       setProgress(p => [...p, `Error: ${error}`]);
     } else {
-      await load();
+      const s = await load();
+      // Fire browser notification if there are urgent insights
+      const urgent = (s?.insights || []).filter(i => i.priority === 1);
+      if (urgent.length > 0 && notifyGranted()) {
+        const first = urgent[0];
+        fireNotification(
+          `🚨 BigBot: ${urgent.length} urgent alert${urgent.length > 1 ? 's' : ''}`,
+          first.title + (urgent.length > 1 ? ` (+${urgent.length - 1} more)` : ''),
+        );
+      }
     }
     setRunning(false);
+  };
+
+  const handleEnableNotifications = async () => {
+    const granted = await requestNotifyPermission();
+    setNotifyPerm(granted ? 'granted' : 'denied');
   };
 
   const handleDismiss = async (id) => {
@@ -386,6 +542,34 @@ export default function BigBot() {
         </div>
       )}
 
+      {/* Notification opt-in banner (only shown if not yet granted or denied) */}
+      {notifyPerm === 'default' && (
+        <div className="mb-5 flex items-center justify-between gap-3 bg-[#EEF6FE] border border-[#2196F3]/20 rounded-xl px-4 py-3">
+          <div className="flex items-center gap-2">
+            <Bell size={14} className="text-[#2196F3] flex-shrink-0" />
+            <span className="text-xs text-[#1565C0]">
+              <span className="font-semibold">Enable notifications</span> — get instant alerts when BigBot finds urgent issues
+            </span>
+          </div>
+          <button
+            onClick={handleEnableNotifications}
+            className="flex-shrink-0 flex items-center gap-1.5 h-7 px-3 rounded-lg bg-[#2196F3] text-white text-xs font-medium hover:bg-[#1565C0] transition-colors"
+          >
+            <Bell size={11} /> Enable
+          </button>
+        </div>
+      )}
+      {notifyPerm === 'granted' && (
+        <div className="mb-5 flex items-center gap-2 text-xs text-emerald-600">
+          <Bell size={11} /> Browser notifications enabled — urgent BigBot alerts will pop up automatically
+        </div>
+      )}
+      {notifyPerm === 'denied' && (
+        <div className="mb-5 flex items-center gap-2 text-xs text-slate-400">
+          <BellOff size={11} /> Notifications blocked — allow them in your browser settings to receive BigBot alerts
+        </div>
+      )}
+
       {/* Config panel */}
       <ConfigPanel />
 
@@ -501,6 +685,9 @@ export default function BigBot() {
           ))}
         </div>
       )}
+
+      {/* Competitor Intel */}
+      <CompetitorIntelPanel />
 
       {/* 24/7 footer note */}
       <div className="mt-8 text-center">
