@@ -5,7 +5,7 @@ import {
   Plus, Mail, Phone, Globe, ChevronRight, Loader,
   AlertTriangle, X, Users, DollarSign, TrendingUp, Check, Zap,
   Clock, Copy, Send, FileText, PenLine, Search, Download, Upload,
-  CheckSquare, Square, CalendarCheck, ChevronDown, ChevronUp,
+  CheckSquare, Square, CalendarCheck, ChevronDown, ChevronUp, Edit2,
 } from 'lucide-react';
 import CampaignBuilder from '../components/CampaignBuilder';
 import { writeFollowUp, queueFollowUp } from '../agents/bigBotEngine';
@@ -77,7 +77,10 @@ function FollowUpModal({ prospect, onClose }) {
             <>
               <div className="bg-slate-50 rounded-xl border border-slate-200 p-4 mb-4 font-mono text-xs text-slate-700 leading-relaxed whitespace-pre-wrap max-h-64 overflow-y-auto">{output}</div>
               {queued ? (
-                <div className="flex items-center gap-2 justify-center text-sm font-medium text-emerald-600 py-2"><Check size={14} /> Queued — will send when Resend is connected</div>
+                <div className="flex items-center gap-2 justify-center text-sm font-medium text-emerald-600 py-2">
+                  <Check size={14} />
+                  {import.meta.env.VITE_RESEND_API_KEY ? 'Email sent!' : 'Queued — will send when Resend is connected'}
+                </div>
               ) : (
                 <div className="flex gap-2">
                   <button onClick={handleCopy} className="flex-1 flex items-center justify-center gap-2 h-10 rounded-xl border border-slate-200 text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors">
@@ -337,6 +340,86 @@ function TasksPanel({ prospectId }) {
   );
 }
 
+// ─── Edit Prospect Modal ──────────────────────────────────────────────────────
+function EditModal({ prospect, onClose, onSave }) {
+  const [form,   setForm]   = useState({ ...prospect });
+  const [saving, setSaving] = useState(false);
+  const ic = 'w-full text-sm border border-slate-200 rounded-lg px-3 py-2.5 bg-white focus:outline-none focus:ring-2 focus:ring-[#2196F3]/30 focus:border-[#2196F3] transition-colors';
+
+  const handle = async (e) => {
+    e.preventDefault();
+    setSaving(true);
+    await onSave(prospect.id, {
+      company_name: form.company_name,
+      contact_name: form.contact_name || null,
+      email:        form.email        || null,
+      phone:        form.phone        || null,
+      website:      form.website      || null,
+      niche:        form.niche        || null,
+      location:     form.location     || null,
+      notes:        form.notes        || null,
+      monthly_value: form.monthly_value ? Number(form.monthly_value) : null,
+    });
+    setSaving(false);
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={onClose}>
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 sticky top-0 bg-white rounded-t-2xl">
+          <h3 className="text-base font-semibold text-slate-900">Edit prospect</h3>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-700"><X size={18} /></button>
+        </div>
+        <form onSubmit={handle} className="p-6 grid grid-cols-2 gap-4">
+          <div className="col-span-2">
+            <label className="block text-xs font-medium text-slate-500 mb-1.5">Company name <span className="text-red-400">*</span></label>
+            <input value={form.company_name || ''} onChange={e => setForm(f => ({ ...f, company_name: e.target.value }))} required className={ic} />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-slate-500 mb-1.5">Contact name</label>
+            <input value={form.contact_name || ''} onChange={e => setForm(f => ({ ...f, contact_name: e.target.value }))} className={ic} />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-slate-500 mb-1.5">Email</label>
+            <input type="email" value={form.email || ''} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} className={ic} />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-slate-500 mb-1.5">Phone</label>
+            <input value={form.phone || ''} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))} className={ic} />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-slate-500 mb-1.5">Website</label>
+            <input value={form.website || ''} onChange={e => setForm(f => ({ ...f, website: e.target.value }))} className={ic} />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-slate-500 mb-1.5">Niche</label>
+            <input value={form.niche || ''} onChange={e => setForm(f => ({ ...f, niche: e.target.value }))} className={ic} />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-slate-500 mb-1.5">Location</label>
+            <input value={form.location || ''} onChange={e => setForm(f => ({ ...f, location: e.target.value }))} className={ic} />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-slate-500 mb-1.5">Monthly retainer ($)</label>
+            <input type="number" min="0" value={form.monthly_value || ''} onChange={e => setForm(f => ({ ...f, monthly_value: e.target.value }))} className={ic} placeholder="e.g. 2500" />
+          </div>
+          <div className="col-span-2">
+            <label className="block text-xs font-medium text-slate-500 mb-1.5">Notes</label>
+            <textarea rows={3} value={form.notes || ''} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} className={ic + ' resize-none'} />
+          </div>
+          <div className="col-span-2 flex gap-2">
+            <button type="button" onClick={onClose} className="flex-1 h-10 rounded-xl border border-slate-200 text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors">Cancel</button>
+            <button type="submit" disabled={saving || !form.company_name?.trim()}
+              className="flex-1 h-10 rounded-xl bg-[#2196F3] text-white text-sm font-medium hover:bg-[#1565C0] transition-colors disabled:opacity-50">
+              {saving ? 'Saving…' : 'Save changes'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 // ─── CSV Import modal ─────────────────────────────────────────────────────────
 function ImportModal({ onClose, onImport, defaultNiche, defaultLocation }) {
   const [text, setText]       = useState('');
@@ -521,7 +604,7 @@ const BLANK = {
 };
 
 // ─── ProspectCard ─────────────────────────────────────────────────────────────
-function ProspectCard({ p, stage, onMove, onDelete, onFollowUp, onProposal, onContract, moving }) {
+function ProspectCard({ p, stage, onMove, onDelete, onEdit, onConfirmDelete, confirmingDelete, onFollowUp, onProposal, onContract, moving }) {
   const [showTasks, setShowTasks] = useState(false);
   const nextStage = STAGES.find(s => s.id === stage?.next);
 
@@ -621,7 +704,18 @@ function ProspectCard({ p, stage, onMove, onDelete, onFollowUp, onProposal, onCo
           )}
         </div>
         <div className="flex items-center gap-2">
-          <button onClick={() => onDelete(p.id)} className="text-xs text-slate-300 hover:text-red-400 transition-colors px-1">Remove</button>
+          <button onClick={() => onEdit(p)} className="text-xs text-slate-300 hover:text-[#2196F3] transition-colors px-1 flex items-center gap-0.5">
+            <Edit2 size={10} /> Edit
+          </button>
+          {confirmingDelete === p.id ? (
+            <div className="flex items-center gap-1">
+              <span className="text-xs text-red-600 font-medium">Delete?</span>
+              <button onClick={() => onConfirmDelete(p.id)} className="text-xs font-semibold text-red-600 hover:text-red-800 transition-colors px-1">Yes</button>
+              <button onClick={() => onDelete(null)} className="text-xs text-slate-400 hover:text-slate-600 transition-colors px-1">No</button>
+            </div>
+          ) : (
+            <button onClick={() => onDelete(p.id)} className="text-xs text-slate-300 hover:text-red-400 transition-colors px-1">Remove</button>
+          )}
           <div className="flex items-center gap-1.5 flex-wrap">
             {p.status === 'call_booked' && (
               <button onClick={() => onProposal?.(p)} className="flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-lg bg-[#F97316]/10 text-[#F97316] border border-[#F97316]/20 hover:bg-[#F97316]/20 transition-colors">
@@ -669,6 +763,9 @@ export default function Pipeline({ onNavigate }) {
   const [newClient,      setNewClient]      = useState(null);
   const [followUpTarget, setFollowUpTarget] = useState(null);
   const [dealTarget,     setDealTarget]     = useState(null);
+  const [editTarget,     setEditTarget]     = useState(null);   // prospect being edited
+  const [deleteConfirm,  setDeleteConfirm]  = useState(null);  // prospect id awaiting confirm
+  const [globalSearch,   setGlobalSearch]   = useState(false); // search across all stages
 
   const load = useCallback(async () => {
     if (!isSupabaseConfigured() || !supabase) { setLoading(false); return; }
@@ -696,45 +793,66 @@ export default function Pipeline({ onNavigate }) {
     setForm(BLANK); setShowAdd(false); setSaving(false); setTab('new');
   };
 
-  // ── CSV export ─────────────────────────────────────────────────────────────
+  // ── CSV export — exports currently visible/filtered prospects ───────────────
   const handleExport = () => {
+    const toExport = (globalSearch && search.trim()) ? filtered : (search.trim() ? filtered : prospects);
     exportToCSV(
-      prospects.map(p => ({
-        company_name:  p.company_name,
-        contact_name:  p.contact_name,
-        email:         p.email,
-        phone:         p.phone,
-        website:       p.website,
-        niche:         p.niche,
-        location:      p.location,
-        status:        p.status,
-        monthly_value: p.monthly_value,
-        notes:         p.notes,
+      toExport.map(p => ({
+        company_name:   p.company_name,
+        contact_name:   p.contact_name,
+        email:          p.email,
+        phone:          p.phone,
+        website:        p.website,
+        niche:          p.niche,
+        location:       p.location,
+        status:         p.status,
+        monthly_value:  p.monthly_value,
+        notes:          p.notes,
         last_contacted: p.last_contacted_at,
-        created_at:    p.created_at,
+        created_at:     p.created_at,
       })),
-      'pipeline-prospects'
+      `pipeline-${tab}-${new Date().toISOString().slice(0, 10)}`
     );
   };
 
-  // ── CSV import ─────────────────────────────────────────────────────────────
+  // ── CSV import — deduplicates against existing company names ────────────────
   const handleImport = async (rows) => {
     if (!isSupabaseConfigured() || !supabase || !rows.length) {
       return { imported: 0, skipped: rows.length, error: 'Supabase not connected' };
     }
-    const payload = rows.map(r => ({ ...r, status: 'new' }));
+    // Dedup against existing prospects
+    const existingNames = new Set(prospects.map(p => p.company_name?.toLowerCase().trim()));
+    const deduped = rows.filter(r => !existingNames.has(r.company_name?.toLowerCase().trim()));
+    const dupeCount = rows.length - deduped.length;
+
+    if (!deduped.length) {
+      return { imported: 0, skipped: rows.length, error: `All ${rows.length} companies already exist in your pipeline` };
+    }
+
+    const payload = deduped.map(r => ({ ...r, status: 'new' }));
     const { data, error } = await supabase.from('prospects').insert(payload).select();
     if (error) return { imported: 0, skipped: rows.length, error: error.message };
     const imported = data?.length || 0;
     if (data) setProspects(prev => [...data, ...prev]);
-    return { imported, skipped: rows.length - imported };
+    return { imported, skipped: dupeCount, duplicatesSkipped: dupeCount };
   };
 
   const moveStage = async (id, nextStatus) => {
     if (!supabase) return;
+    // Warn if moving to client without monthly_value set
+    if (nextStatus === 'client') {
+      const p = prospects.find(x => x.id === id);
+      if (p && !p.monthly_value) {
+        const retainer = window.prompt(`Set monthly retainer for ${p.company_name} before marking as client (e.g. 2500):`);
+        if (retainer && !isNaN(Number(retainer)) && Number(retainer) > 0) {
+          await supabase.from('prospects').update({ monthly_value: Number(retainer) }).eq('id', id);
+          setProspects(prev => prev.map(x => x.id === id ? { ...x, monthly_value: Number(retainer) } : x));
+        }
+      }
+    }
     setMovingId(id);
     const patch = {
-      status: nextStatus,
+      status:     nextStatus,
       updated_at: new Date().toISOString(),
       ...(nextStatus === 'contacted' ? { last_contacted_at: new Date().toISOString() } : {}),
     };
@@ -749,28 +867,40 @@ export default function Pipeline({ onNavigate }) {
 
   const deleteProspect = async (id) => {
     if (!supabase) return;
+    // Show inline confirmation instead of browser confirm()
+    setDeleteConfirm(id);
+  };
+
+  const confirmDelete = async (id) => {
+    if (!supabase) return;
     await supabase.from('prospects').delete().eq('id', id);
     setProspects(p => p.filter(x => x.id !== id));
+    setDeleteConfirm(null);
+  };
+
+  const updateProspect = async (id, patch) => {
+    if (!supabase) return;
+    await supabase.from('prospects').update({ ...patch, updated_at: new Date().toISOString() }).eq('id', id);
+    setProspects(p => p.map(x => x.id === id ? { ...x, ...patch } : x));
+    setEditTarget(null);
   };
 
   // ── Computed ───────────────────────────────────────────────────────────────
   const counts = Object.fromEntries(STAGES.map(s => [s.id, prospects.filter(p => p.status === s.id).length]));
   const mrr    = prospects.filter(p => p.status === 'client' && p.monthly_value).reduce((s, p) => s + Number(p.monthly_value), 0);
 
-  // Apply search filter
-  const baseFiltered = prospects.filter(p => p.status === tab);
-  const filtered = search.trim()
-    ? baseFiltered.filter(p => {
-        const q = search.toLowerCase();
-        return (
-          p.company_name?.toLowerCase().includes(q) ||
-          p.contact_name?.toLowerCase().includes(q) ||
-          p.email?.toLowerCase().includes(q) ||
-          p.niche?.toLowerCase().includes(q) ||
-          p.location?.toLowerCase().includes(q)
-        );
-      })
-    : baseFiltered;
+  // Search logic — global (all stages) or scoped to current tab
+  const matchesSearch = (p, q) => (
+    p.company_name?.toLowerCase().includes(q) ||
+    p.contact_name?.toLowerCase().includes(q) ||
+    p.email?.toLowerCase().includes(q) ||
+    p.niche?.toLowerCase().includes(q) ||
+    p.location?.toLowerCase().includes(q)
+  );
+  const q = search.trim().toLowerCase();
+  const filtered = q
+    ? (globalSearch ? prospects : prospects.filter(p => p.status === tab)).filter(p => matchesSearch(p, q))
+    : prospects.filter(p => p.status === tab);
 
   const currentStage = STAGES.find(s => s.id === tab);
   const inputClass = 'w-full text-sm border border-slate-200 rounded-lg px-3 py-2.5 bg-white text-slate-900 placeholder-slate-300 focus:outline-none focus:ring-2 focus:ring-[#2196F3]/30 focus:border-[#2196F3] transition-colors';
@@ -829,15 +959,28 @@ export default function Pipeline({ onNavigate }) {
 
       {/* Search + Stage tabs row */}
       <div className="flex flex-col sm:flex-row gap-3 mb-5">
-        {/* Search */}
-        <div className="relative flex-shrink-0 sm:w-52">
-          <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-          <input
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            placeholder="Search prospects…"
-            className="w-full text-sm border border-slate-200 rounded-xl pl-8 pr-3 py-1.5 bg-white text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#2196F3]/30 focus:border-[#2196F3] transition-colors shadow-sm"
-          />
+        {/* Search with global toggle */}
+        <div className="flex items-center gap-2 flex-shrink-0">
+          <div className="relative sm:w-52">
+            <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+            <input
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Search prospects…"
+              className="w-full text-sm border border-slate-200 rounded-xl pl-8 pr-3 py-1.5 bg-white text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#2196F3]/30 focus:border-[#2196F3] transition-colors shadow-sm"
+            />
+          </div>
+          {search.trim() && (
+            <button
+              onClick={() => setGlobalSearch(g => !g)}
+              className={`text-xs font-medium px-2.5 py-1.5 rounded-lg border transition-colors whitespace-nowrap ${
+                globalSearch ? 'bg-[#2196F3] text-white border-[#2196F3]' : 'border-slate-200 text-slate-500 hover:border-slate-300'
+              }`}
+              title="Search all stages"
+            >
+              All stages
+            </button>
+          )}
         </div>
 
         {/* Stage tabs */}
@@ -898,6 +1041,9 @@ export default function Pipeline({ onNavigate }) {
             stage={currentStage}
             onMove={moveStage}
             onDelete={deleteProspect}
+            onEdit={setEditTarget}
+            onConfirmDelete={confirmDelete}
+            confirmingDelete={deleteConfirm}
             onFollowUp={setFollowUpTarget}
             onProposal={p => setDealTarget({ prospect: p, mode: 'proposal' })}
             onContract={p => setDealTarget({ prospect: p, mode: 'contract' })}
@@ -909,6 +1055,7 @@ export default function Pipeline({ onNavigate }) {
       {/* Modals */}
       {newClient && <CampaignBuilder prospect={newClient} onClose={() => setNewClient(null)} onComplete={() => {}} />}
       {followUpTarget && <FollowUpModal prospect={followUpTarget} onClose={() => setFollowUpTarget(null)} />}
+      {editTarget && <EditModal prospect={editTarget} onClose={() => setEditTarget(null)} onSave={updateProspect} />}
       {dealTarget && (
         <DealModal
           prospect={dealTarget.prospect}

@@ -5,9 +5,13 @@
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { SYSTEM_PROMPTS } from './systemPrompts';
 
-const API_KEY      = import.meta.env.VITE_ANTHROPIC_API_KEY;
-const RESEND_KEY   = import.meta.env.VITE_RESEND_API_KEY;
-const DEMO_MODE    = !API_KEY || API_KEY === 'your_anthropic_key_here' || API_KEY.trim() === '';
+const API_KEY    = import.meta.env.VITE_ANTHROPIC_API_KEY;
+const RESEND_KEY = import.meta.env.VITE_RESEND_API_KEY;
+const FROM_EMAIL = import.meta.env.VITE_FROM_EMAIL || 'ali@amaleads.org';
+const FROM_NAME  = import.meta.env.VITE_FROM_NAME  || 'Ali — AMA Leads';
+const DEMO_MODE  = !API_KEY || API_KEY === 'your_anthropic_key_here' || API_KEY.trim() === '';
+
+const UNSUBSCRIBE_FOOTER = `\n\n---\nTo unsubscribe from AMA Leads outreach, reply with "unsubscribe" in the subject line.\nAMA Leads · amaleads.org`;
 
 function generateToken() {
   const arr = new Uint8Array(24);
@@ -15,7 +19,7 @@ function generateToken() {
   return Array.from(arr, b => b.toString(16).padStart(2, '0')).join('');
 }
 
-// ─── Call Claude ─────────────────────────────────────────────────────────────
+// ─── Call Claude ──────────────────────────────────────────────────────────────
 async function callClaude(systemPrompt, userContent, model = 'claude-sonnet-4-20250514', maxTokens = 2000) {
   if (DEMO_MODE) return null;
   const res = await fetch('https://api.anthropic.com/v1/messages', {
@@ -27,9 +31,7 @@ async function callClaude(systemPrompt, userContent, model = 'claude-sonnet-4-20
       'anthropic-dangerous-direct-browser-access': 'true',
     },
     body: JSON.stringify({
-      model,
-      max_tokens: maxTokens,
-      system: systemPrompt,
+      model, max_tokens: maxTokens, system: systemPrompt,
       messages: [{ role: 'user', content: userContent }],
     }),
   });
@@ -39,7 +41,8 @@ async function callClaude(systemPrompt, userContent, model = 'claude-sonnet-4-20
 }
 
 // ─── Send email via Resend ────────────────────────────────────────────────────
-async function sendEmail({ to, toName, subject, body, from = 'ali@amaleads.org', fromName = 'Ali — AMA Leads' }) {
+async function sendEmail({ to, toName, subject, body, addUnsubscribe = true }) {
+  const fullBody = addUnsubscribe ? body + UNSUBSCRIBE_FOOTER : body;
   if (!RESEND_KEY || RESEND_KEY === 'your_resend_key_here') {
     console.log('[contractEngine] Resend not connected — would send to:', to, 'Subject:', subject);
     return { queued: true };
@@ -48,10 +51,10 @@ async function sendEmail({ to, toName, subject, body, from = 'ali@amaleads.org',
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${RESEND_KEY}` },
     body: JSON.stringify({
-      from: `${fromName} <${from}>`,
-      to: [`${toName} <${to}>`],
+      from: `${FROM_NAME} <${FROM_EMAIL}>`,
+      to:   [toName ? `${toName} <${to}>` : to],
       subject,
-      text: body,
+      text: fullBody,
     }),
   });
   const data = await res.json();
@@ -62,11 +65,8 @@ async function sendEmail({ to, toName, subject, body, from = 'ali@amaleads.org',
 async function logAutomation(triggerType, triggerData, actionTaken, agentIds = [], status = 'success') {
   if (!supabase) return;
   await supabase.from('automation_log').insert({
-    trigger_type: triggerType,
-    trigger_data: triggerData,
-    action_taken: actionTaken,
-    agent_ids: agentIds,
-    status,
+    trigger_type: triggerType, trigger_data: triggerData,
+    action_taken: actionTaken, agent_ids: agentIds, status,
   });
 }
 
@@ -76,6 +76,30 @@ async function logAutomation(triggerType, triggerData, actionTaken, agentIds = [
 
 export async function generateProposal(prospect, onProgress) {
   const log = msg => onProgress?.(msg);
+
+  // ── Dedup: don't create a second draft if one already exists ─────────────────
+  if (isSupabaseConfigured() && supabase && prospect.id) {
+    const { data: existing } = await supabase
+      .from('proposals')
+      .select('id, content, status')
+      .eq('prospect_id', prospect.id)
+      .in('status', ['draft', 'sent'])
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (existing) {
+      log('Using existing proposal ✓');
+      const subjMatch = existing.content?.match(/SUBJECT LINE:\s*(.*)/i);
+      return {
+        success: true,
+        content: existing.content,
+        subject: subjMatch?.[1]?.trim() || `${prospect.company_name} — Google Ads Proposal`,
+        proposalId: existing.id,
+        reused: true,
+      };
+    }
+  }
 
   const prompt = `Company: ${prospect.company_name}
 Niche: ${prospect.niche}
@@ -101,7 +125,7 @@ EXECUTIVE SUMMARY
 We've identified a clear gap in ${prospect.company_name}'s digital presence — specifically the absence of paid search advertising while competitors in ${prospect.location} actively capture high-intent ${prospect.niche} searches. This proposal outlines a data-driven Google Ads strategy to generate qualified leads within 30 days.
 
 THE OPPORTUNITY
-${prospect.niche.charAt(0).toUpperCase() + prospect.niche.slice(1)} in ${prospect.location} see 800–2,400 monthly Google searches for relevant keywords. Your current digital footprint relies on organic and referral traffic, leaving paid intent traffic — the highest-converting source — entirely to competitors. We found 6 active advertisers in your market, meaning the opportunity window is open but won't stay that way.
+${prospect.niche?.charAt(0).toUpperCase() + (prospect.niche?.slice(1) || '')} in ${prospect.location} see 800–2,400 monthly Google searches for relevant keywords. Your current digital footprint relies on organic and referral traffic, leaving paid intent traffic — the highest-converting source — entirely to competitors. We found 6 active advertisers in your market, meaning the opportunity window is open but won't stay that way.
 
 WHAT WE'LL DO
 - Month 1: Campaign build and launch — keyword research, ad copy, landing page, conversion tracking
@@ -118,7 +142,7 @@ THE NUMBERS
 WHY AMA LEADS
 - We specialize exclusively in ${prospect.niche} — we know your customer's search behavior cold
 - Performance guarantee — if you don't get leads in 30 days, month 2 is free
-- You own all campaign assets — campaigns, keywords, data — from day one
+- You own all campaign assets from day one
 
 NEXT STEPS
 1. Review this proposal
@@ -134,19 +158,17 @@ amaleads.org`;
 
   if (!content) return { error: 'Failed to generate proposal' };
 
-  // Extract subject line
   const subjectMatch = content.match(/SUBJECT LINE:\s*(.*)/i);
   const subject = subjectMatch?.[1]?.trim() || `${prospect.company_name} — Google Ads Proposal`;
 
-  // Store in Supabase
   let proposalId = null;
   if (isSupabaseConfigured() && supabase) {
     const { data } = await supabase.from('proposals').insert({
-      prospect_id:  prospect.id,
-      company_name: prospect.company_name,
-      contact_name: prospect.contact_name,
-      niche:        prospect.niche,
-      location:     prospect.location,
+      prospect_id:   prospect.id,
+      company_name:  prospect.company_name,
+      contact_name:  prospect.contact_name,
+      niche:         prospect.niche,
+      location:      prospect.location,
       monthly_value: Number(prospect.monthly_value) || 2500,
       content,
       status: 'draft',
@@ -176,17 +198,8 @@ export async function sendProposal(proposalId, prospect, proposalContent, subjec
   });
 
   if (isSupabaseConfigured() && supabase && proposalId) {
-    await supabase.from('proposals').update({
-      status: 'sent',
-      sent_at: new Date().toISOString(),
-    }).eq('id', proposalId);
-
-    await logAutomation(
-      'proposal_sent',
-      { prospect_id: prospect.id, proposal_id: proposalId },
-      `Sent proposal email to ${prospect.email}`,
-      [10]
-    );
+    await supabase.from('proposals').update({ status: 'sent', sent_at: new Date().toISOString() }).eq('id', proposalId);
+    await logAutomation('proposal_sent', { prospect_id: prospect.id, proposal_id: proposalId }, `Sent proposal email to ${prospect.email}`, [10]);
   }
 
   return emailResult;
@@ -198,6 +211,30 @@ export async function sendProposal(proposalId, prospect, proposalContent, subjec
 
 export async function generateContract(prospect, onProgress) {
   const log = msg => onProgress?.(msg);
+
+  // ── Dedup: return existing sent contract if one exists ───────────────────────
+  if (isSupabaseConfigured() && supabase && prospect.id) {
+    const { data: existing } = await supabase
+      .from('contracts')
+      .select('id, content, signing_token, monthly_retainer, status')
+      .eq('prospect_id', prospect.id)
+      .in('status', ['draft', 'sent'])
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (existing) {
+      log('Using existing contract ✓');
+      return {
+        success: true,
+        content:      existing.content,
+        signingToken: existing.signing_token,
+        contractId:   existing.id,
+        retainer:     existing.monthly_retainer,
+        reused:       true,
+      };
+    }
+  }
 
   const retainer = Number(prospect.monthly_value) || 2500;
   const today    = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
@@ -229,13 +266,13 @@ Ad spend is paid directly by Client to Google. Agency does not hold ad budgets.
 This agreement begins on the date of signing and continues month-to-month. Either party may terminate with 30 days written notice.
 
 4. PERFORMANCE
-Agency targets 15–25 qualified leads per month at the agreed budget. Results depend on market conditions, ad spend, and website conversion rate. Agency is not liable for results outside its direct control.
+Agency targets 15–25 qualified leads per month at the agreed budget. Results depend on market conditions, ad spend, and website conversion rate.
 
 5. CLIENT RESPONSIBILITIES
 Client must: provide Google Ads account access within 48 hours of signing, maintain active payment method with Google, respond to Agency requests within 48 hours, maintain a functional landing page.
 
 6. OWNERSHIP
-All Google Ads assets (campaigns, keywords, audiences) belong to the Client. Agency has no claim to any assets created during the engagement.
+All Google Ads assets (campaigns, keywords, audiences) belong to the Client.
 
 7. CONFIDENTIALITY
 Both parties agree to keep business information confidential.
@@ -289,8 +326,11 @@ Date: ___________________`;
 export async function sendContractEmail(contract, prospect, appUrl = window.location.origin) {
   if (!prospect.email) return { error: 'No email address for prospect' };
 
-  const signingUrl = `${appUrl}?sign=${contract.signingToken}`;
-  const firstName  = (prospect.contact_name || 'there').split(' ')[0];
+  // Support both camelCase (from generateContract return) and snake_case (from DB)
+  const contractDbId = contract.contractId || contract.id;
+  const signingUrl   = `${appUrl}?sign=${contract.signingToken || contract.signing_token}`;
+  const retainerAmt  = contract.retainer || contract.monthly_retainer;
+  const firstName    = (prospect.contact_name || 'there').split(' ')[0];
 
   const emailBody = `Hi ${firstName},
 
@@ -301,7 +341,7 @@ ${signingUrl}
 
 Agreement summary:
 - Services: Google Ads campaign management for ${prospect.company_name}
-- Monthly fee: $${contract.retainer}/month
+- Monthly fee: $${retainerAmt}/month
 - Term: Month-to-month (30-day cancellation notice)
 - Campaign goes live within 5 business days of signing
 
@@ -318,14 +358,12 @@ amaleads.org`;
     body:    emailBody,
   });
 
-  if (isSupabaseConfigured() && supabase && contract.contractId) {
-    await supabase.from('contracts').update({
-      status:  'sent',
-    }).eq('id', contract.contractId);
-
+  // Update contract status to 'sent' using whichever id field is present
+  if (isSupabaseConfigured() && supabase && contractDbId) {
+    await supabase.from('contracts').update({ status: 'sent' }).eq('id', contractDbId);
     await logAutomation(
       'contract_sent',
-      { contract_id: contract.contractId, prospect_id: prospect.id },
+      { contract_id: contractDbId, prospect_id: prospect.id },
       `Sent contract email to ${prospect.email} with signing link`,
       [11]
     );
@@ -340,41 +378,46 @@ amaleads.org`;
 
 export async function fetchContractByToken(token) {
   if (!supabase) return null;
-  const { data } = await supabase
-    .from('contracts')
-    .select('*')
-    .eq('signing_token', token)
-    .single();
+  const { data } = await supabase.from('contracts').select('*').eq('signing_token', token).single();
   return data;
 }
 
-export async function signContract(token) {
+export async function signContract(token, signerName = '') {
   if (!supabase) return { error: 'Supabase not connected' };
+
+  // ── Idempotency: if already signed, return success without re-triggering ─────
+  const { data: existing } = await supabase
+    .from('contracts').select('*').eq('signing_token', token).single();
+
+  if (!existing) return { error: 'Contract not found. This link may be expired or invalid.' };
+  if (existing.status === 'signed') return { success: true, contract: existing, alreadySigned: true };
+
+  // ── Sign it ───────────────────────────────────────────────────────────────────
+  const updatePayload = {
+    status:    'signed',
+    signed_at: new Date().toISOString(),
+  };
+  // Save the signer's typed name if provided
+  if (signerName?.trim()) updatePayload.contact_name = signerName.trim();
 
   const { data: contract, error } = await supabase
     .from('contracts')
-    .update({
-      status:    'signed',
-      signed_at: new Date().toISOString(),
-    })
+    .update(updatePayload)
     .eq('signing_token', token)
     .select()
     .single();
 
-  if (error || !contract) return { error: error?.message || 'Contract not found' };
+  if (error || !contract) return { error: error?.message || 'Signing failed' };
 
-  // Log the signing event
   await logAutomation(
     'contract_signed',
-    { contract_id: contract.id, company: contract.company_name },
-    `Contract signed by ${contract.contact_name || contract.company_name} — campaign build triggered`,
+    { contract_id: contract.id, company: contract.company_name, signer: signerName },
+    `Contract signed by ${signerName || contract.contact_name || contract.company_name} — campaign build triggered`,
     [12]
   );
 
-  // Send onboarding email automatically
-  try {
-    await sendOnboardingEmail(contract);
-  } catch (e) {
+  // Send onboarding email
+  try { await sendOnboardingEmail(contract); } catch (e) {
     console.error('[contractEngine] Onboarding email failed:', e.message);
   }
 
@@ -383,9 +426,9 @@ export async function signContract(token) {
 
 // ─── Onboarding email (Agent 12) after signing ───────────────────────────────
 export async function sendOnboardingEmail(contract) {
-  const firstName   = (contract.contact_name || 'there').split(' ')[0];
-  const startDate   = new Date();
-  startDate.setDate(startDate.getDate() + 2); // 48h from now for access
+  const firstName      = (contract.contact_name || 'there').split(' ')[0];
+  const startDate      = new Date();
+  startDate.setDate(startDate.getDate() + 2);
   const accessDeadline = startDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
   const campaignDate   = new Date(startDate.getTime() + 3 * 86400000)
     .toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
@@ -427,7 +470,6 @@ amaleads.org
 P.S. Save this email — it has your campaign timeline and the Google Ads access instructions you'll need.`;
   } else {
     const generated = await callClaude(SYSTEM_PROMPTS[12], prompt, 'claude-haiku-4-20250514', 800);
-    // Extract body after EMAIL:
     const bodyMatch = generated?.match(/EMAIL:\s*([\s\S]+)/i);
     emailBody = bodyMatch?.[1]?.trim() || generated || '';
   }
@@ -438,6 +480,7 @@ P.S. Save this email — it has your campaign timeline and the Google Ads access
       toName:  contract.contact_name || contract.company_name,
       subject: `Welcome to AMA Leads — ${contract.company_name} is officially starting`,
       body:    emailBody,
+      addUnsubscribe: false, // onboarding emails don't need unsubscribe
     });
   }
 
@@ -454,28 +497,21 @@ P.S. Save this email — it has your campaign timeline and the Google Ads access
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// FETCH ALL CONTRACTS (for Contracts page)
+// FETCH
 // ═══════════════════════════════════════════════════════════════════════════════
 
 export async function fetchContracts() {
   if (!isSupabaseConfigured() || !supabase) return [];
-  const { data } = await supabase
-    .from('contracts')
-    .select('*')
-    .order('created_at', { ascending: false });
+  const { data } = await supabase.from('contracts').select('*').order('created_at', { ascending: false });
   return data || [];
 }
 
 export async function fetchProposals() {
   if (!isSupabaseConfigured() || !supabase) return [];
-  const { data } = await supabase
-    .from('proposals')
-    .select('*')
-    .order('created_at', { ascending: false });
+  const { data } = await supabase.from('proposals').select('*').order('created_at', { ascending: false });
   return data || [];
 }
 
-// ─── Mark campaign triggered after contract signed ────────────────────────────
 export async function markCampaignTriggered(contractId) {
   if (!supabase) return;
   await supabase.from('contracts').update({ campaign_triggered: true }).eq('id', contractId);

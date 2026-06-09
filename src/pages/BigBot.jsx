@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { Bot, Play, RefreshCw, AlertTriangle, CheckCircle2, Clock, Zap,
          ChevronRight, X, TrendingUp, Mail, Shield, Cpu, BarChart2, Loader,
          FileText, PenLine, BarChart, Repeat, Settings, ToggleLeft, ToggleRight,
-         Bell, BellOff, Eye, ChevronDown, ChevronUp, Copy } from 'lucide-react';
+         Bell, BellOff, Eye, ChevronDown, ChevronUp, Copy, Send } from 'lucide-react';
 import { runBigBot, getBigBotStatus, dismissInsight, markApplied } from '../agents/bigBotEngine';
 import { isSupabaseConfigured, supabase } from '../lib/supabase';
 
@@ -254,6 +254,187 @@ function ConfigPanel() {
               >
                 {saving ? <><Loader size={12} className="animate-spin" /> Saving…</> : 'Save settings'}
               </button>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Email Queue Panel ────────────────────────────────────────────────────────
+function EmailQueuePanel() {
+  const [emails,     setEmails]     = useState([]);
+  const [loading,    setLoading]    = useState(false);
+  const [open,       setOpen]       = useState(false);
+  const [processing, setProcessing] = useState(false);
+  const [processLog, setProcessLog] = useState('');
+
+  useEffect(() => {
+    if (!open) return;
+    if (!isSupabaseConfigured() || !supabase) { return; }
+    setLoading(true);
+    supabase.from('email_queue').select('*').order('created_at', { ascending: false }).limit(50)
+      .then(({ data }) => { setEmails(data || []); setLoading(false); });
+  }, [open]);
+
+  const handleProcess = async () => {
+    setProcessing(true);
+    setProcessLog('');
+    const { processEmailQueue } = await import('../agents/bigBotEngine');
+    const result = await processEmailQueue(msg => setProcessLog(msg));
+    if (result?.sent !== undefined) setProcessLog(`✓ ${result.sent} sent, ${result.failed || 0} failed`);
+    // Refresh list
+    const { data } = await supabase.from('email_queue').select('*').order('created_at', { ascending: false }).limit(50);
+    setEmails(data || []);
+    setProcessing(false);
+  };
+
+  const STATUS_COLOR = {
+    sent:            'bg-emerald-100 text-emerald-700',
+    pending:         'bg-blue-100 text-blue-700',
+    waiting_for_api: 'bg-amber-100 text-amber-700',
+    failed:          'bg-red-100 text-red-600',
+  };
+
+  const pending  = emails.filter(e => ['pending','waiting_for_api'].includes(e.status)).length;
+  const sent     = emails.filter(e => e.status === 'sent').length;
+  const failed   = emails.filter(e => e.status === 'failed').length;
+
+  if (!isSupabaseConfigured()) return null;
+
+  return (
+    <div className="mb-5">
+      <button
+        onClick={() => setOpen(v => !v)}
+        className="w-full flex items-center justify-between bg-white border border-slate-200 rounded-xl px-4 py-3.5 shadow-sm hover:bg-slate-50 transition-colors"
+      >
+        <div className="flex items-center gap-2">
+          <Mail size={14} className="text-slate-400" />
+          <span className="text-sm font-semibold text-slate-700">Email Queue</span>
+          {pending > 0 && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">{pending} pending</span>}
+          {failed > 0  && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-100 text-red-600">{failed} failed</span>}
+        </div>
+        <span className="text-xs text-slate-400">{open ? '▲ collapse' : '▼ expand'}</span>
+      </button>
+
+      {open && (
+        <div className="bg-white border border-slate-200 border-t-0 rounded-b-xl px-4 py-4 shadow-sm">
+          {/* Summary + process button */}
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex gap-3 text-xs text-slate-500">
+              <span className="text-emerald-600 font-medium">{sent} sent</span>
+              <span className="text-amber-600 font-medium">{pending} queued</span>
+              {failed > 0 && <span className="text-red-600 font-medium">{failed} failed</span>}
+            </div>
+            <button
+              onClick={handleProcess}
+              disabled={processing || pending === 0}
+              className="flex items-center gap-1.5 h-7 px-3 rounded-lg bg-[#2196F3] text-white text-xs font-medium hover:bg-[#1565C0] transition-colors disabled:opacity-40"
+            >
+              {processing ? <><Loader size={10} className="animate-spin" /> Processing…</> : <><Send size={10} /> Send {pending} queued</>}
+            </button>
+          </div>
+          {processLog && <div className="text-xs text-emerald-700 bg-emerald-50 rounded-lg px-3 py-2 mb-3">{processLog}</div>}
+
+          {loading ? (
+            <div className="text-xs text-slate-400 flex items-center gap-1.5 py-2"><Loader size={11} className="animate-spin" /> Loading…</div>
+          ) : emails.length === 0 ? (
+            <div className="text-xs text-slate-400 italic py-2">No emails in queue yet</div>
+          ) : (
+            <div className="space-y-2 max-h-64 overflow-y-auto">
+              {emails.map(e => (
+                <div key={e.id} className="flex items-start justify-between gap-3 text-xs border border-slate-100 rounded-lg px-3 py-2">
+                  <div className="flex-1 min-w-0">
+                    <div className="font-medium text-slate-700 truncate">{e.subject}</div>
+                    <div className="text-slate-400 truncate">{e.to_name || e.to_email || '(no address)'}</div>
+                  </div>
+                  <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full flex-shrink-0 ${STATUS_COLOR[e.status] || 'bg-slate-100 text-slate-500'}`}>
+                    {e.status}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Agent Improvements Panel ─────────────────────────────────────────────────
+function AgentImprovementsPanel() {
+  const [improvements, setImprovements] = useState([]);
+  const [loading,      setLoading]      = useState(false);
+  const [open,         setOpen]         = useState(false);
+
+  useEffect(() => {
+    if (!open) return;
+    if (!isSupabaseConfigured() || !supabase) return;
+    setLoading(true);
+    supabase.from('agent_improvements').select('*').order('created_at', { ascending: false }).limit(20)
+      .then(({ data }) => { setImprovements(data || []); setLoading(false); });
+  }, [open]);
+
+  const updateStatus = async (id, status) => {
+    if (!supabase) return;
+    await supabase.from('agent_improvements').update({ status }).eq('id', id);
+    setImprovements(prev => prev.map(i => i.id === id ? { ...i, status } : i));
+  };
+
+  const pending  = improvements.filter(i => i.status === 'pending').length;
+  if (!isSupabaseConfigured()) return null;
+
+  return (
+    <div className="mb-5">
+      <button
+        onClick={() => setOpen(v => !v)}
+        className="w-full flex items-center justify-between bg-white border border-slate-200 rounded-xl px-4 py-3.5 shadow-sm hover:bg-slate-50 transition-colors"
+      >
+        <div className="flex items-center gap-2">
+          <Zap size={14} className="text-slate-400" />
+          <span className="text-sm font-semibold text-slate-700">Agent Improvements</span>
+          {pending > 0 && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-violet-100 text-violet-700">{pending} pending review</span>}
+        </div>
+        <span className="text-xs text-slate-400">{open ? '▲ collapse' : '▼ expand'}</span>
+      </button>
+
+      {open && (
+        <div className="bg-white border border-slate-200 border-t-0 rounded-b-xl px-4 py-4 shadow-sm">
+          {loading ? (
+            <div className="text-xs text-slate-400 flex items-center gap-1.5 py-2"><Loader size={11} className="animate-spin" /> Loading…</div>
+          ) : improvements.length === 0 ? (
+            <div className="text-xs text-slate-400 italic py-2">No improvement suggestions yet — BigBot generates these when it detects patterns of agent failure</div>
+          ) : (
+            <div className="space-y-3 max-h-80 overflow-y-auto">
+              {improvements.map(imp => (
+                <div key={imp.id} className="border border-slate-200 rounded-xl p-3">
+                  <div className="flex items-center justify-between gap-2 mb-2">
+                    <span className="text-xs font-semibold text-slate-700">A{imp.agent_id} — {imp.agent_name}</span>
+                    <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
+                      imp.status === 'pending'  ? 'bg-amber-100 text-amber-700' :
+                      imp.status === 'approved' ? 'bg-emerald-100 text-emerald-700' :
+                      'bg-slate-100 text-slate-500'
+                    }`}>{imp.status}</span>
+                  </div>
+                  <div className="text-xs text-slate-500 mb-2 leading-relaxed">{imp.reason}</div>
+                  <div className="bg-slate-50 rounded-lg p-2 font-mono text-[11px] text-slate-700 leading-relaxed mb-3 max-h-24 overflow-y-auto">
+                    {imp.improved_prompt}
+                  </div>
+                  {imp.status === 'pending' && (
+                    <div className="flex gap-2">
+                      <button onClick={() => updateStatus(imp.id, 'approved')}
+                        className="flex-1 h-7 rounded-lg bg-emerald-600 text-white text-xs font-medium hover:bg-emerald-700 transition-colors">
+                        Approve
+                      </button>
+                      <button onClick={() => updateStatus(imp.id, 'rejected')}
+                        className="flex-1 h-7 rounded-lg border border-slate-200 text-xs font-medium text-slate-500 hover:bg-slate-50 transition-colors">
+                        Reject
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ))}
             </div>
           )}
         </div>
@@ -685,6 +866,12 @@ export default function BigBot() {
           ))}
         </div>
       )}
+
+      {/* Email Queue Panel */}
+      <EmailQueuePanel />
+
+      {/* Agent Improvements Panel */}
+      <AgentImprovementsPanel />
 
       {/* Competitor Intel */}
       <CompetitorIntelPanel />

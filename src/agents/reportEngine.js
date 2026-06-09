@@ -9,6 +9,8 @@ import { fetchCampaignPerformance } from './googleAdsApi';
 
 const API_KEY    = import.meta.env.VITE_ANTHROPIC_API_KEY;
 const RESEND_KEY = import.meta.env.VITE_RESEND_API_KEY;
+const FROM_EMAIL = import.meta.env.VITE_FROM_EMAIL || 'ali@amaleads.org';
+const FROM_NAME  = import.meta.env.VITE_FROM_NAME  || 'Ali — AMA Leads';
 const DEMO_MODE  = !API_KEY || API_KEY === 'your_anthropic_key_here' || API_KEY.trim() === '';
 
 // ─── Shared helpers ───────────────────────────────────────────────────────────
@@ -40,7 +42,7 @@ async function sendEmail({ to, toName, subject, body }) {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${RESEND_KEY}` },
     body: JSON.stringify({
-      from: 'Ali — AMA Leads <ali@amaleads.org>',
+      from: `${FROM_NAME} <${FROM_EMAIL}>`,
       to:   [`${toName} <${to}>`],
       subject,
       text:  body,

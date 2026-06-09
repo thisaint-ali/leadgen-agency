@@ -7,7 +7,7 @@ import {
 import CitySearch from './CitySearch';
 import { importProspectsFromAgent1 } from '../agents/autoImport';
 import { SYSTEM_PROMPTS } from '../agents/systemPrompts';
-import { runAllAgents, callAgent, isDemoMode } from '../agents/orchestrator';
+import { runAllAgents, callAgent, isDemoMode, abortCurrentRun } from '../agents/orchestrator';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { parseAgent3Email, batchPersonalize } from '../agents/bigBotEngine';
 import StatusDot from './StatusDot';
@@ -516,17 +516,27 @@ export default function AgentNetwork() {
               className={inputClass}
             />
           </div>
-          <button
-            onClick={run} disabled={running}
-            className={`w-full flex items-center justify-center gap-2 h-10 rounded-lg text-sm font-medium transition-colors ${
-              running ? 'bg-slate-100 text-slate-500 cursor-not-allowed' : 'bg-[#2196F3] text-white hover:bg-[#1565C0]'
-            }`}
-          >
-            {running
-              ? <><Loader size={14} className="animate-spin" /> Running — {completedCount}/7 complete{errorCount > 0 ? ` · ${errorCount} error` : ''}</>
-              : <><Play size={14} /> {finished ? 'Run again' : 'Run all 7 pipeline agents'}</>
-            }
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={run} disabled={running}
+              className={`flex-1 flex items-center justify-center gap-2 h-10 rounded-lg text-sm font-medium transition-colors ${
+                running ? 'bg-slate-100 text-slate-500 cursor-not-allowed' : 'bg-[#2196F3] text-white hover:bg-[#1565C0]'
+              }`}
+            >
+              {running
+                ? <><Loader size={14} className="animate-spin" /> Running — {completedCount}/7 complete{errorCount > 0 ? ` · ${errorCount} error` : ''}</>
+                : <><Play size={14} /> {finished ? 'Run again' : 'Run all 7 pipeline agents'}</>
+              }
+            </button>
+            {running && (
+              <button
+                onClick={() => { abortCurrentRun(); setRunning(false); addLog('Run cancelled by user'); }}
+                className="h-10 px-4 rounded-lg border border-red-200 text-red-600 text-sm font-medium hover:bg-red-50 transition-colors"
+              >
+                Cancel
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Waves */}

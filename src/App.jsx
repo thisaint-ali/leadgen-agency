@@ -12,6 +12,8 @@ import Integrations from './pages/Integrations';
 import BigBot from './pages/BigBot';
 import Contracts from './pages/Contracts';
 import Performance from './pages/Performance';
+import Billing from './pages/Billing';
+import Reports from './pages/Reports';
 import SignContract from './pages/SignContract';
 import Login from './pages/Login';
 
@@ -21,7 +23,9 @@ const PAGES = {
   master:       MasterAgent,
   pipeline:     Pipeline,
   contracts:    Contracts,
+  billing:      Billing,
   performance:  Performance,
+  reports:      Reports,
   agents:       Agents,
   prospects:    Prospects,
   integrations: Integrations,

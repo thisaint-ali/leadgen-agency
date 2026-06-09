@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Search, Network, BookOpen, LayoutDashboard, History, LogOut, Menu, X, Briefcase, Bot, Plug, Cpu, FileText, BarChart2 } from 'lucide-react';
+import { Search, Network, BookOpen, LayoutDashboard, History, LogOut, Menu, X, Briefcase, Bot, Plug, Cpu, FileText, BarChart2, CreditCard, ClipboardList } from 'lucide-react';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { getConnectedCount } from '../integrations/index';
 
@@ -9,7 +9,9 @@ const NAV = [
   { id: 'master',        label: 'Master Agent',      icon: Bot },
   { id: 'pipeline',      label: 'Pipeline',          icon: Briefcase },
   { id: 'contracts',     label: 'Contracts',         icon: FileText },
+  { id: 'billing',       label: 'Billing',           icon: CreditCard },
   { id: 'performance',   label: 'Performance',       icon: BarChart2 },
+  { id: 'reports',       label: 'Client Reports',    icon: ClipboardList },
   { id: 'agents',        label: 'Agent Network',     icon: Network },
   { id: 'prospects',     label: 'Prospect Finder',   icon: Search },
   { id: 'integrations',  label: 'Integrations',      icon: Plug },
@@ -63,7 +65,7 @@ export default function Sidebar({ current, onChange }) {
               <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${active ? 'bg-white' : 'bg-emerald-400'}`} />
             )}
             {id === 'bigbot' && (
-              <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 animate-pulse ${active ? 'bg-white' : 'bg-[#2196F3]'}`} />
+              <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${active ? 'bg-white' : 'bg-[#2196F3]'}`} />
             )}
           </button>
         );

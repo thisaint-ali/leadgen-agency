@@ -1,6 +1,8 @@
 // Auto-import: parse Agent 1 prospect list → insert into Supabase prospects table
 // Uses Claude Haiku (fast + cheap) to extract structured data from free-text output
 
+import { supabase, isSupabaseConfigured } from '../lib/supabase';
+
 const API_KEY = import.meta.env.VITE_ANTHROPIC_API_KEY;
 
 /**
@@ -20,7 +22,7 @@ async function parseProspectsFromText(text) {
         },
         body: JSON.stringify({
           model: 'claude-haiku-4-20250514',
-          max_tokens: 2000,
+          max_tokens: 4000,
           system: 'Extract business prospect data. Return ONLY a valid JSON array, no other text.',
           messages: [{
             role: 'user',
@@ -93,11 +95,25 @@ export async function importProspectsFromAgent1(agent1Output, { niche, location,
 
   if (!rows.length) return { imported: 0, error: 'Could not extract valid company names' };
 
-  // Insert to Supabase (or return in-memory if no Supabase)
+  // Insert to Supabase — skip duplicates by checking existing company names
   if (supabase) {
-    const { data, error } = await supabase.from('prospects').insert(rows).select();
-    if (error) return { imported: 0, error: error.message };
-    return { imported: data.length, prospects: data };
+    // Fetch existing company names (case-insensitive dedup)
+    const { data: existing } = await supabase
+      .from('prospects')
+      .select('company_name')
+      .limit(2000);
+    const existingNames = new Set(
+      (existing || []).map(p => p.company_name?.toLowerCase().trim())
+    );
+
+    const deduped  = rows.filter(r => !existingNames.has(r.company_name?.toLowerCase().trim()));
+    const skipped  = rows.length - deduped.length;
+
+    if (!deduped.length) return { imported: 0, skipped: rows.length, error: 'All prospects already exist in your database' };
+
+    const { data, error } = await supabase.from('prospects').insert(deduped).select();
+    if (error) return { imported: 0, skipped: rows.length, error: error.message };
+    return { imported: data.length, skipped, prospects: data };
   }
 
   return { imported: rows.length, prospects: rows, note: 'Supabase not configured — data not persisted' };

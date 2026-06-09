@@ -172,11 +172,15 @@ export default function Dashboard({ onNavigate }) {
   }, []);
 
   // ── Computed values ──────────────────────────────────────────────────────────
-  const mrr = clients.reduce((sum, c) => sum + (Number(c.monthly_value) || 0), 0);
-  const contractMrr = contracts
-    .filter(c => c.status === 'signed')
-    .reduce((sum, c) => sum + (Number(c.monthly_retainer) || 0), 0);
-  const totalMrr = Math.max(mrr, contractMrr);
+  // Per-client MRR: signed contract takes priority over prospect monthly_value
+  const signedContracts = contracts.filter(c => c.status === 'signed');
+  const contractMrr     = signedContracts.reduce((sum, c) => sum + (Number(c.monthly_retainer) || 0), 0);
+  // Clients with no signed contract — use their prospect monthly_value
+  const contractedNames = new Set(signedContracts.map(c => c.company_name?.toLowerCase()));
+  const uncontrractedMrr = clients
+    .filter(c => !contractedNames.has(c.company_name?.toLowerCase()))
+    .reduce((sum, c) => sum + (Number(c.monthly_value) || 0), 0);
+  const totalMrr = contractMrr + uncontrractedMrr;
 
   const activePeriod = PERIODS.find(p => p.id === period) || PERIODS[1];
   const revenue = activePeriod.calc(totalMrr);

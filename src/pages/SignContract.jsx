@@ -28,10 +28,11 @@ export default function SignContract({ token }) {
   }, [token]);
 
   const handleSign = async () => {
-    if (!name.trim()) { setError('Please enter your name to sign.'); return; }
+    if (!name.trim()) { setError('Please enter your full name to sign.'); return; }
     setSigning(true);
     setError(null);
-    const result = await signContract(token);
+    // Pass signer name so it gets saved on the contract record
+    const result = await signContract(token, name.trim());
     if (result.error) {
       setError(result.error);
       setSigning(false);

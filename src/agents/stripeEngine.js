@@ -9,6 +9,8 @@ import { supabase, isSupabaseConfigured } from '../lib/supabase';
 const STRIPE_PK        = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY;
 const SUPABASE_URL     = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_ANON    = import.meta.env.VITE_SUPABASE_ANON_KEY;
+const FROM_EMAIL       = import.meta.env.VITE_FROM_EMAIL || 'ali@amaleads.org';
+const FROM_NAME        = import.meta.env.VITE_FROM_NAME  || 'Ali — AMA Leads';
 
 export const isStripeConnected = () =>
   !!(STRIPE_PK && STRIPE_PK !== 'your_stripe_publishable_key');
@@ -124,7 +126,7 @@ AMA Leads`;
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${RESEND_KEY}` },
     body: JSON.stringify({
-      from: 'Ali — AMA Leads <ali@amaleads.org>',
+      from: `${FROM_NAME} <${FROM_EMAIL}>`,
       to:   [`${contract.contact_name || contract.company_name} <${contract.contact_email}>`],
       subject: `Set up your AMA Leads payment — ${contract.company_name}`,
       text: body,

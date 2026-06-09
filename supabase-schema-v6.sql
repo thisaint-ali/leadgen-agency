@@ -62,7 +62,9 @@ alter table public.agent_templates enable row level security;
 alter table public.campaign_metrics enable row level security;
 alter table public.bigbot_config   enable row level security;
 
-create policy if not exists "tasks_all"     on public.tasks           for all using (true) with check (true);
-create policy if not exists "templates_all" on public.agent_templates for all using (true) with check (true);
-create policy if not exists "metrics_all"   on public.campaign_metrics for all using (true) with check (true);
-create policy if not exists "config_all"    on public.bigbot_config   for all using (true) with check (true);
+do $$ begin
+  if not exists (select 1 from pg_policies where tablename='tasks'            and policyname='tasks_all')     then create policy "tasks_all"     on public.tasks            for all using (true) with check (true); end if;
+  if not exists (select 1 from pg_policies where tablename='agent_templates'  and policyname='templates_all') then create policy "templates_all" on public.agent_templates  for all using (true) with check (true); end if;
+  if not exists (select 1 from pg_policies where tablename='campaign_metrics' and policyname='metrics_all')   then create policy "metrics_all"   on public.campaign_metrics  for all using (true) with check (true); end if;
+  if not exists (select 1 from pg_policies where tablename='bigbot_config'    and policyname='config_all')    then create policy "config_all"    on public.bigbot_config     for all using (true) with check (true); end if;
+end $$;

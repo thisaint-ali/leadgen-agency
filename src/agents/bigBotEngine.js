@@ -6,9 +6,14 @@ import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { SYSTEM_PROMPTS } from './systemPrompts';
 import { runWeeklyReportsForAllClients, syncAllCampaignPerformance } from './reportEngine';
 
-const API_KEY = import.meta.env.VITE_ANTHROPIC_API_KEY;
+const API_KEY    = import.meta.env.VITE_ANTHROPIC_API_KEY;
+const RESEND_KEY = import.meta.env.VITE_RESEND_API_KEY;
+const FROM_EMAIL = import.meta.env.VITE_FROM_EMAIL || 'ali@amaleads.org';
+const FROM_NAME  = import.meta.env.VITE_FROM_NAME  || 'Ali — AMA Leads';
 
 const DEMO_MODE = !API_KEY || API_KEY === 'your_anthropic_key_here' || API_KEY.trim() === '';
+
+const UNSUBSCRIBE_FOOTER = `\n\n---\nTo unsubscribe from AMA Leads outreach, reply with "unsubscribe" in the subject line.`;
 
 // ─── Main analysis run ──────────────────────────────────────────────────────────
 export async function runBigBot({ trigger = 'manual', onProgress } = {}) {
@@ -56,10 +61,17 @@ export async function runBigBot({ trigger = 'manual', onProgress } = {}) {
     const errorsByAgent = {};
     agentErrors.forEach(e => { errorsByAgent[e.agent_name] = (errorsByAgent[e.agent_name] || 0) + 1; });
 
+    // Read stale_days from config (default 7 if not set)
+    let staleDays = 7;
+    try {
+      const { data: cfg } = await supabase.from('bigbot_config').select('stale_days').eq('id', 1).maybeSingle();
+      if (cfg?.stale_days) staleDays = cfg.stale_days;
+    } catch { /* use default */ }
+
     const staleProspects = prospects.filter(p => {
       if (['new', 'client', 'dead'].includes(p.status)) return false;
       const last = p.last_contacted_at || p.updated_at;
-      return (Date.now() - new Date(last)) / 86400000 > 7;
+      return (Date.now() - new Date(last)) / 86400000 > staleDays;
     });
 
     const pipelineCounts = {};
@@ -290,45 +302,92 @@ export async function batchPersonalize(prospectList, niche, location) {
   return data.content?.[0]?.text?.trim() || '';
 }
 
-// ─── Queue a follow-up email to the email_queue + email_sequences tables ────────
+// ─── Queue a follow-up email + attempt immediate send via Resend ─────────────
 export async function queueFollowUp(prospect, subject, body, sequenceNumber) {
   if (!supabase) return { error: 'Supabase not configured' };
+
+  const unsubFooter = `\n\n---\nTo unsubscribe, reply with "unsubscribe" in the subject line.`;
+  const fullBody    = body + unsubFooter;
+
   await supabase.from('email_sequences').insert({
-    prospect_id: prospect.id,
+    prospect_id:     prospect.id,
     sequence_number: sequenceNumber,
-    subject,
-    body,
+    subject, body,
     status: 'queued',
     scheduled_at: new Date().toISOString(),
-    niche: prospect.niche,
+    niche:    prospect.niche,
     location: prospect.location,
   });
+
+  // Try to send immediately if Resend is connected and email is available
+  let sendStatus = 'waiting_for_api';
+  let resendMsgId = null;
+
+  if (RESEND_KEY && prospect.email) {
+    try {
+      const res = await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${RESEND_KEY}` },
+        body: JSON.stringify({
+          from:    `${FROM_NAME} <${FROM_EMAIL}>`,
+          to:      [`${prospect.contact_name || prospect.company_name} <${prospect.email}>`],
+          subject, text: fullBody,
+        }),
+      });
+      const data = await res.json();
+      if (res.ok) { sendStatus = 'sent'; resendMsgId = data.id; }
+      else          sendStatus = 'failed';
+    } catch {
+      sendStatus = 'failed';
+    }
+  } else if (prospect.email) {
+    sendStatus = 'pending'; // has email but no Resend key yet — will be picked up by processEmailQueue
+  }
+
   const { error } = await supabase.from('email_queue').insert({
     prospect_id: prospect.id,
-    to_email: prospect.email || null,
-    to_name: prospect.contact_name || prospect.company_name,
-    subject,
-    body,
-    status: prospect.email ? 'pending' : 'waiting_for_api',
+    to_email:    prospect.email || null,
+    to_name:     prospect.contact_name || prospect.company_name,
+    subject, body: fullBody,
+    status:      sendStatus,
+    sent_at:     sendStatus === 'sent' ? new Date().toISOString() : null,
+    resend_message_id: resendMsgId,
   });
-  return error ? { error: error.message } : { success: true };
+
+  return error ? { error: error.message } : { success: true, sent: sendStatus === 'sent' };
 }
 
 // ─── Parse Agent 3 output → extract best email variant ─────────────────────────
 export function parseAgent3Email(agent3Output) {
   if (!agent3Output) return null;
-  // Try to extract VARIANT A (pain-led) subject + body
-  const subjectMatch = agent3Output.match(/subject(?:\s+line(?:s)?)?[:\s]*1[:\s]*(.*)/im)
-    || agent3Output.match(/subject[:\s]*(.*)/im);
-  const bodyStart = agent3Output.search(/VARIANT A/i) > -1
-    ? agent3Output.search(/VARIANT A/i)
-    : 0;
-  const bodySection = agent3Output.slice(bodyStart, bodyStart + 1500);
-  const emailBodyMatch = bodySection.match(/EMAIL[:\s]*([\s\S]{30,600})(?:DM:|FOLLOW-UP|VARIANT B|$)/i);
+
+  // Try variants in order of preference: A (pain), B (opportunity), C (proof)
+  for (const variantLabel of ['VARIANT A', 'VARIANT B', 'VARIANT C']) {
+    const variantIdx = agent3Output.search(new RegExp(variantLabel, 'i'));
+    if (variantIdx === -1) continue;
+
+    const section = agent3Output.slice(variantIdx, variantIdx + 2000);
+
+    // Extract first subject line in this variant's section
+    const subjectMatch = section.match(/SUBJECT(?:\s+LINE)?[:\s](?:\d+[:.]\s*)?(.*?)(?:\n|$)/im);
+    // Extract email body — between EMAIL: and the next major section
+    const emailBodyMatch = section.match(/EMAIL[:\s]*\n([\s\S]{30,800})(?:\nDM[:\s]|\nFOLLOW-UP|\nVARIANT [BC]|$)/i);
+
+    if (subjectMatch?.[1] && emailBodyMatch?.[1]) {
+      return {
+        subject: subjectMatch[1].trim().replace(/["`]/g, ''),
+        body:    emailBodyMatch[1].trim(),
+      };
+    }
+  }
+
+  // Fallback: grab any subject + reasonable body chunk
+  const anySubject = agent3Output.match(/SUBJECT(?:\s+LINE)?[:\s](?:\d+[:.]\s*)?(.*?)(?:\n|$)/im);
+  const anyEmail   = agent3Output.match(/EMAIL[:\s]*\n([\s\S]{30,600}?)(?:\n(?:DM|FOLLOW-UP|VARIANT|\-\-\-)|\s*$)/i);
 
   return {
-    subject: subjectMatch?.[1]?.trim().replace(/["`]/g, '') || 'Quick question about your Google Ads',
-    body: emailBodyMatch?.[1]?.trim() || agent3Output.slice(0, 500),
+    subject: anySubject?.[1]?.trim().replace(/["`]/g, '') || 'Quick question about your Google Ads',
+    body:    anyEmail?.[1]?.trim() || agent3Output.slice(0, 600).trim(),
   };
 }
 
@@ -363,7 +422,7 @@ export async function processEmailQueue(onProgress) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${RESEND_KEY}` },
         body: JSON.stringify({
-          from: 'Ali — AMA Leads <ali@amaleads.org>',
+          from: `${FROM_NAME} <${FROM_EMAIL}>`,
           to:   [`${email.to_name || ''} <${email.to_email}>`],
           subject: email.subject,
           text:  email.body,
