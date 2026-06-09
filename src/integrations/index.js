@@ -44,10 +44,15 @@ export const INTEGRATIONS = {
   googleAds: {
     key: 'googleAds',
     name: 'Google Ads',
-    envKey: 'VITE_GOOGLE_ADS_KEY',
+    envKey: 'VITE_GOOGLE_ADS_DEVELOPER_TOKEN',
     category: 'Ads',
     icon: '📈',
-    connected: () => !!import.meta.env.VITE_GOOGLE_ADS_KEY,
+    connected: () => !!(
+      import.meta.env.VITE_GOOGLE_ADS_DEVELOPER_TOKEN &&
+      import.meta.env.VITE_GOOGLE_ADS_CLIENT_ID &&
+      import.meta.env.VITE_GOOGLE_ADS_REFRESH_TOKEN &&
+      import.meta.env.VITE_GOOGLE_ADS_CUSTOMER_ID
+    ),
     unlocks: [
       'Auto-create campaigns from agent output',
       'Push keywords + RSA ad copy directly',
@@ -56,7 +61,7 @@ export const INTEGRATIONS = {
     ],
     getKeyUrl: 'https://developers.google.com/google-ads/api/docs/get-started/introduction',
     docsUrl: 'https://developers.google.com/google-ads/api',
-    setupInstructions: 'Apply for Google Ads API access, set up OAuth, get a developer token. Add VITE_GOOGLE_ADS_KEY to .env. Typically takes 1-3 days for approval.',
+    setupInstructions: 'Add 5 env vars to Vercel: VITE_GOOGLE_ADS_DEVELOPER_TOKEN, VITE_GOOGLE_ADS_CLIENT_ID, VITE_GOOGLE_ADS_CLIENT_SECRET, VITE_GOOGLE_ADS_REFRESH_TOKEN, VITE_GOOGLE_ADS_CUSTOMER_ID. Apply for API access at developers.google.com/google-ads/api (takes 1-3 days).',
   },
 
   ghl: {

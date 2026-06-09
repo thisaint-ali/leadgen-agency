@@ -29,6 +29,8 @@ const SUPABASE_URL      = Deno.env.get('SUPABASE_URL')              || '';
 const SUPABASE_KEY      = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY')         || '';
 const RESEND_API_KEY    = Deno.env.get('RESEND_API_KEY')            || '';
+const FROM_EMAIL        = Deno.env.get('FROM_EMAIL')                || 'ali@amaleads.org';
+const FROM_NAME         = Deno.env.get('FROM_NAME')                 || 'Ali — AMA Leads';
 
 // ─── Type helpers ─────────────────────────────────────────────────────────────
 interface Prospect   { id: string; company_name: string; status: string; monthly_value: number; last_contacted_at: string; updated_at: string; niche: string; location: string; }
@@ -36,7 +38,7 @@ interface AgentOut   { agent_id: number; agent_name: string; status: string; cre
 interface EmailRow   { id: string; status: string; subject: string; body: string; to_email: string; prospect_id: string; created_at: string; }
 interface Campaign   { status: string; niche: string; location: string; audit_output: string; }
 interface Insight    { title: string; }
-interface Contract   { id: string; company_name: string; status: string; contact_email: string; contact_name: string; monthly_retainer: number; signing_token: string; signed_at: string; campaign_triggered: boolean; created_at: string; }
+interface Contract   { id: string; prospect_id: string; company_name: string; status: string; contact_email: string; contact_name: string; monthly_retainer: number; signing_token: string; signed_at: string; campaign_triggered: boolean; created_at: string; }
 interface AIInsight  { type: string; priority: number; title: string; insight: string; action: string; agent_id: number | null; }
 
 Deno.serve(async (_req: Request) => {
@@ -64,7 +66,7 @@ Deno.serve(async (_req: Request) => {
         supabase.from('email_queue').select('id,status,subject,body,to_email,prospect_id,created_at').order('created_at', { ascending: false }).limit(50),
         supabase.from('campaigns').select('status,niche,location,audit_output').order('created_at', { ascending: false }).limit(10),
         supabase.from('bigbot_insights').select('title').gte('created_at', sevenDaysAgo).eq('dismissed', false),
-        supabase.from('contracts').select('id,company_name,status,contact_email,contact_name,monthly_retainer,signing_token,signed_at,campaign_triggered,created_at').order('created_at', { ascending: false }).limit(50),
+        supabase.from('contracts').select('id,prospect_id,company_name,status,contact_email,contact_name,monthly_retainer,signing_token,signed_at,campaign_triggered,created_at').order('created_at', { ascending: false }).limit(50),
       ]);
 
     const prospects    = (prospectsRes.data    || []) as Prospect[];
@@ -91,7 +93,7 @@ Deno.serve(async (_req: Request) => {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${RESEND_API_KEY}` },
             body: JSON.stringify({
-              from: 'Ali — AMA Leads <ali@amaleads.org>',
+              from: `${FROM_NAME} <${FROM_EMAIL}>`,
               to: [email.to_email],
               subject: email.subject,
               text: email.body,
@@ -190,16 +192,25 @@ Deno.serve(async (_req: Request) => {
       const sevenDaysAgoDate = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
 
       for (const contract of signedContracts.slice(0, 5)) { // Max 5 per run to stay within timeout
+        // Use prospect_id for the report (that's the FK on client_reports)
+        const reportProspectId = contract.prospect_id || contract.id;
+
         // Check if we already sent a report this week
         const { data: recentReport } = await supabase
           .from('client_reports')
           .select('id')
-          .eq('prospect_id', contract.id)
+          .eq('prospect_id', reportProspectId)
           .gte('created_at', sevenDaysAgoDate)
           .limit(1)
-          .single();
+          .maybeSingle();
 
         if (recentReport) continue; // Already sent this week
+
+        const weekStart = new Date();
+        weekStart.setDate(weekStart.getDate() - weekStart.getDay() + 1); // Monday
+        const weekEnd   = new Date(weekStart.getTime() + 6 * 86400000);   // Sunday
+        const periodStart = weekStart.toISOString().slice(0, 10);
+        const periodEnd   = weekEnd.toISOString().slice(0, 10);
 
         try {
           // Generate weekly report via Claude Haiku
@@ -216,8 +227,8 @@ Keep it under 500 words. Be specific and data-driven.`,
                 role: 'user',
                 content: `Generate a weekly report for ${contract.company_name}.
 Service: Google Ads Management. Monthly retainer: $${contract.monthly_retainer}.
-Week: ${new Date().toDateString()}.
-Note: Live Google Ads data sync not yet configured — write a professional report explaining that the campaign is being actively managed and that detailed metrics will be shared once the reporting dashboard is connected.`,
+Week: ${periodStart} to ${periodEnd}.
+Note: Live Google Ads data sync not yet configured — write a professional report explaining that the campaign is being actively managed and that detailed metrics will be shared once the Google Ads API is connected.`,
               }],
             }),
           });
@@ -226,24 +237,27 @@ Note: Live Google Ads data sync not yet configured — write a professional repo
           const reportContent = reportData.content?.[0]?.text || '';
 
           if (reportContent) {
-            // Store report
+            // Store report — using period_start/period_end (not week_start)
             await supabase.from('client_reports').insert({
-              prospect_id: contract.id,
+              prospect_id:  reportProspectId,
               company_name: contract.company_name,
-              report_type: 'weekly',
-              content: reportContent,
-              status: 'draft',
-              week_start: new Date().toISOString().slice(0, 10),
+              report_type:  'weekly',
+              content:      reportContent,
+              status:       'draft',
+              period_start: periodStart,
+              period_end:   periodEnd,
             });
 
             // Queue email to client
             if (contract.contact_email) {
+              const firstName = (contract.contact_name || 'there').split(' ')[0];
               await supabase.from('email_queue').insert({
-                prospect_id: contract.id,
-                to_email: contract.contact_email,
-                subject: `Weekly Google Ads Report — ${contract.company_name} — ${new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`,
-                body: `Hi ${(contract.contact_name || 'there').split(' ')[0]},\n\nHere's your weekly Google Ads performance update:\n\n${reportContent}\n\nBest,\nAli\nAMA Leads\nali@amaleads.org`,
-                status: 'pending',
+                prospect_id: reportProspectId,
+                to_email:    contract.contact_email,
+                to_name:     contract.contact_name || contract.company_name,
+                subject:     `Weekly Google Ads Report — ${contract.company_name} — ${new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`,
+                body:        `Hi ${firstName},\n\nHere's your weekly Google Ads performance update:\n\n${reportContent}\n\nBest,\nAli\nAMA Leads`,
+                status:      'pending',
               });
             }
 

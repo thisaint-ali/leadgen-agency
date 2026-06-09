@@ -497,22 +497,18 @@ export async function runAutomationTriggers(onProgress) {
 
   if (pendingContracts?.length > 0) {
     log(`Found ${pendingContracts.length} signed contract(s) with no campaign yet`);
-    for (const contract of pendingContracts) {
-      log(`Triggering campaign build for ${contract.company_name}…`);
-      if (typeof window !== 'undefined') {
-        window.dispatchEvent(new CustomEvent('buildCampaign', {
-          detail: {
-            id:            contract.prospect_id,
-            company_name:  contract.company_name,
-            contact_name:  contract.contact_name,
-            niche:         contract.niche,
-            location:      contract.location,
-            monthly_value: contract.monthly_retainer,
-            email:         contract.contact_email,
-          },
-        }));
-      }
-    }
+    // Create a priority-1 insight for each — the window event only works if
+    // Pipeline is the active page. Insights surface on every page via BigBot.
+    await supabase.from('bigbot_insights').insert(
+      pendingContracts.map(c => ({
+        type:     'pipeline',
+        priority: 1,
+        title:    `Build campaign for ${c.company_name}`,
+        insight:  `${c.company_name} signed their contract but no Google Ads campaign has been built yet. Monthly retainer: $${c.monthly_retainer}. This is blocking revenue activation.`,
+        action:   `Go to Contracts → click "Build Campaign" for ${c.company_name}`,
+        agent_id: 6,
+      }))
+    );
   }
 
   // 3. Check for prospects stuck at 'proposal' stage for 5+ days

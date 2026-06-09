@@ -16,6 +16,7 @@ import Billing from './pages/Billing';
 import Reports from './pages/Reports';
 import SignContract from './pages/SignContract';
 import Login from './pages/Login';
+import CampaignBuilder from './components/CampaignBuilder';
 
 const PAGES = {
   dashboard:    Dashboard,
@@ -43,12 +44,23 @@ function getSignToken() {
 }
 
 export default function App() {
-  const [page, setPage] = useState('dashboard');
-  const [session, setSession] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [page,            setPage]            = useState('dashboard');
+  const [session,         setSession]         = useState(null);
+  const [loading,         setLoading]         = useState(true);
+  // Global CampaignBuilder — listens for buildCampaign events from ANY page
+  const [campaignProspect, setCampaignProspect] = useState(null);
 
   // Stable — reads window.location.search once, never changes between renders
   const signToken = getSignToken();
+
+  // ── Global buildCampaign event listener ────────────────────────────────────
+  // Fires from: Pipeline card, Contracts page, BigBot automation triggers
+  // Lives here at App level so it works regardless of which page is active
+  useEffect(() => {
+    const handler = (e) => setCampaignProspect(e.detail);
+    window.addEventListener('buildCampaign', handler);
+    return () => window.removeEventListener('buildCampaign', handler);
+  }, []);
 
   useEffect(() => {
     // Skip auth setup entirely for the public signing page
@@ -104,6 +116,15 @@ export default function App() {
       <main className="flex-1 overflow-y-auto pt-14 lg:pt-0">
         <Page onNavigate={setPage} />
       </main>
+
+      {/* Global campaign builder modal — works from any page */}
+      {campaignProspect && (
+        <CampaignBuilder
+          prospect={campaignProspect}
+          onClose={() => setCampaignProspect(null)}
+          onComplete={() => setCampaignProspect(null)}
+        />
+      )}
     </div>
   );
 }

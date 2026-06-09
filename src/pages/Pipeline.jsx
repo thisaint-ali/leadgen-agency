@@ -760,7 +760,6 @@ export default function Pipeline({ onNavigate }) {
   const [form,           setForm]           = useState(BLANK);
   const [saving,         setSaving]         = useState(false);
   const [movingId,       setMovingId]       = useState(null);
-  const [newClient,      setNewClient]      = useState(null);
   const [followUpTarget, setFollowUpTarget] = useState(null);
   const [dealTarget,     setDealTarget]     = useState(null);
   const [editTarget,     setEditTarget]     = useState(null);   // prospect being edited
@@ -776,11 +775,7 @@ export default function Pipeline({ onNavigate }) {
 
   useEffect(() => { load(); }, [load]);
 
-  useEffect(() => {
-    const handler = (e) => setNewClient(e.detail);
-    window.addEventListener('buildCampaign', handler);
-    return () => window.removeEventListener('buildCampaign', handler);
-  }, []);
+  // buildCampaign event is now handled at App.jsx level — works from any page
 
   const addProspect = async (e) => {
     e.preventDefault();
@@ -859,9 +854,13 @@ export default function Pipeline({ onNavigate }) {
     await supabase.from('prospects').update(patch).eq('id', id);
     setProspects(p => p.map(x => x.id === id ? { ...x, ...patch } : x));
     setMovingId(null);
+    // When moving to client, fire the global buildCampaign event
+    // (App.jsx listens for this and shows CampaignBuilder from any page)
     if (nextStatus === 'client') {
       const prospect = prospects.find(p => p.id === id);
-      if (prospect) setNewClient({ ...prospect, ...patch });
+      if (prospect) {
+        window.dispatchEvent(new CustomEvent('buildCampaign', { detail: { ...prospect, ...patch } }));
+      }
     }
   };
 
@@ -1053,7 +1052,6 @@ export default function Pipeline({ onNavigate }) {
       </div>
 
       {/* Modals */}
-      {newClient && <CampaignBuilder prospect={newClient} onClose={() => setNewClient(null)} onComplete={() => {}} />}
       {followUpTarget && <FollowUpModal prospect={followUpTarget} onClose={() => setFollowUpTarget(null)} />}
       {editTarget && <EditModal prospect={editTarget} onClose={() => setEditTarget(null)} onSave={updateProspect} />}
       {dealTarget && (
