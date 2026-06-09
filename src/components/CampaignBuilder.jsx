@@ -6,8 +6,11 @@ import { X, Loader, CheckCircle2, AlertCircle, Zap, ExternalLink } from 'lucide-
 import { callAgent } from '../agents/orchestrator';
 import { SYSTEM_PROMPTS } from '../agents/systemPrompts';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
-import { createCampaign as createGoogleAdsCampaign, isGoogleAdsConnected } from '../integrations/googleAds';
+import { createGoogleAdsCampaign, isGoogleAdsFullyConnected } from '../agents/googleAdsApi';
 import { syncClientToGHL, isGHLConnected } from '../integrations/ghl';
+
+// Alias for consistency with existing call sites
+const isGoogleAdsConnected = isGoogleAdsFullyConnected;
 
 const CAMPAIGN_AGENTS = [
   { id: 4, name: 'Keyword Researcher',   desc: 'Building keyword package + ad groups + negatives' },
@@ -149,18 +152,21 @@ export default function CampaignBuilder({ prospect, onClose, onComplete }) {
     setStep('integrating');
     const results = {};
 
-    // Google Ads
+    // Google Ads — uses the real googleAdsApi.js implementation
     const gadsResult = await createGoogleAdsCampaign({
-      company: prospect.company_name,
-      niche: prospect.niche,
-      location: prospect.location,
-      keywords: ctx[4],
-      adCopy: ctx[5],
-      monthlyBudget: prospect.monthly_value,
+      company:       prospect.company_name,
+      niche:         prospect.niche,
+      location:      prospect.location,
+      monthlyBudget: Number(prospect.monthly_value) || 1500,
+      landingPageUrl: prospect.website?.startsWith('http') ? prospect.website : `https://${prospect.website || 'amaleads.org'}`,
+      agent4Output:  ctx[4] || '',
+      agent5Output:  ctx[5] || '',
+      onProgress:    (msg) => console.log('[GoogleAds]', msg),
     });
     results.googleAds = gadsResult;
-    if (gadsResult.google_ads_campaign_id && dbCampaignId && supabase) {
-      await supabase.from('campaigns').update({ google_ads_campaign_id: gadsResult.google_ads_campaign_id }).eq('id', dbCampaignId);
+    // Save Google Ads campaign ID if creation succeeded
+    if (gadsResult.success && gadsResult.campaignId && dbCampaignId && supabase) {
+      await supabase.from('campaigns').update({ google_ads_campaign_id: String(gadsResult.campaignId) }).eq('id', dbCampaignId);
     }
 
     // GHL

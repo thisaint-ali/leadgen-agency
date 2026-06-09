@@ -8,10 +8,12 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
-const STRIPE_SECRET   = Deno.env.get('STRIPE_SECRET_KEY') || '';
-const WEBHOOK_SECRET  = Deno.env.get('STRIPE_WEBHOOK_SECRET') || '';
-const SUPABASE_URL    = Deno.env.get('SUPABASE_URL') || '';
-const SUPABASE_KEY    = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
+const STRIPE_SECRET   = Deno.env.get('STRIPE_SECRET_KEY')      || '';
+const WEBHOOK_SECRET  = Deno.env.get('STRIPE_WEBHOOK_SECRET')   || '';
+const SUPABASE_URL    = Deno.env.get('SUPABASE_URL')             || '';
+const SUPABASE_KEY    = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')|| '';
+// App URL for Stripe redirect after checkout — set in Supabase secrets
+const APP_URL         = Deno.env.get('APP_URL') || 'https://leadgen-agency-ebon.vercel.app';
 
 const stripeApi = async (endpoint: string, method: string, body?: Record<string, unknown>) => {
   const params = body ? new URLSearchParams(body as Record<string, string>).toString() : '';
@@ -70,8 +72,8 @@ serve(async (req) => {
         mode:                      'subscription',
         'line_items[0][price]':    price.id,
         'line_items[0][quantity]': '1',
-        success_url:               'https://amaleads.org/billing-success',
-        cancel_url:                'https://amaleads.org/billing-cancel',
+        success_url:               `${APP_URL}?billing=success&company=${encodeURIComponent(customer_name)}`,
+        cancel_url:                `${APP_URL}?billing=cancelled`,
         'metadata[contract_id]':   contract_id,
       });
 
@@ -82,8 +84,24 @@ serve(async (req) => {
       }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    // ── Stripe webhook (payment_intent.succeeded, invoice.paid, etc.) ─────────
+    // ── Stripe webhook (direct from Stripe, verified by signature) ───────────
     if (body.action === 'webhook') {
+      // Verify webhook signature to prevent spoofed events
+      const stripeSignature = req.headers.get('stripe-signature');
+      if (WEBHOOK_SECRET && stripeSignature) {
+        // Reconstruct the signed payload and verify HMAC
+        const rawBody = JSON.stringify(body.event || body);
+        const parts   = stripeSignature.split(',');
+        const ts      = parts.find(p => p.startsWith('t='))?.slice(2) || '';
+        const v1      = parts.find(p => p.startsWith('v1='))?.slice(3) || '';
+        const payload = `${ts}.${rawBody}`;
+        const key     = await crypto.subtle.importKey('raw', new TextEncoder().encode(WEBHOOK_SECRET), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+        const sig     = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(payload));
+        const computed = Array.from(new Uint8Array(sig)).map(b => b.toString(16).padStart(2, '0')).join('');
+        if (computed !== v1) {
+          return new Response(JSON.stringify({ error: 'Invalid webhook signature' }), { status: 400 });
+        }
+      }
       const event = body.event;
 
       if (event.type === 'invoice.paid') {

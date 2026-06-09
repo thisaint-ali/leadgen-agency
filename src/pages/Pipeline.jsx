@@ -7,7 +7,6 @@ import {
   Clock, Copy, Send, FileText, PenLine, Search, Download, Upload,
   CheckSquare, Square, CalendarCheck, ChevronDown, ChevronUp, Edit2,
 } from 'lucide-react';
-import CampaignBuilder from '../components/CampaignBuilder';
 import { writeFollowUp, queueFollowUp } from '../agents/bigBotEngine';
 import { generateProposal, sendProposal, generateContract, sendContractEmail } from '../agents/contractEngine';
 
@@ -560,6 +559,7 @@ const STAGES = [
   { id: 'call_booked', label: 'Call Booked',  color: 'violet',  next: 'proposal',    nextLabel: 'Proposal sent'    },
   { id: 'proposal',    label: 'Proposal',     color: 'orange',  next: 'client',      nextLabel: 'Signed ✓'         },
   { id: 'client',      label: 'Client ✓',     color: 'emerald', next: null,          nextLabel: null               },
+  { id: 'dead',        label: 'Dead',         color: 'slate',   next: null,          nextLabel: null               },
 ];
 
 const STAGE_BADGE = {
@@ -569,6 +569,7 @@ const STAGE_BADGE = {
   violet:  'bg-violet-100 text-violet-700',
   orange:  'bg-orange-100 text-orange-700',
   emerald: 'bg-emerald-100 text-emerald-700',
+  // dead uses slate
 };
 
 const NICHES = [
@@ -733,7 +734,7 @@ function ProspectCard({ p, stage, onMove, onDelete, onEdit, onConfirmDelete, con
                 {moving ? <Loader size={11} className="animate-spin" /> : <><ChevronRight size={11} /> {stage.nextLabel}</>}
               </button>
             )}
-            {!stage?.next && (
+            {!stage?.next && p.status === 'client' && (
               <div className="flex items-center gap-2">
                 <span className="flex items-center gap-1 text-xs text-emerald-600 font-medium"><Check size={12} /> Active client</span>
                 <button onClick={() => p && window.dispatchEvent(new CustomEvent('buildCampaign', { detail: p }))}
@@ -741,6 +742,18 @@ function ProspectCard({ p, stage, onMove, onDelete, onEdit, onConfirmDelete, con
                   <Zap size={10} /> Build Campaign
                 </button>
               </div>
+            )}
+            {p.status === 'dead' && (
+              <button onClick={() => onMove(p.id, 'new')}
+                className="flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors">
+                ↺ Revive
+              </button>
+            )}
+            {p.status !== 'dead' && p.status !== 'client' && (
+              <button onClick={() => onMove(p.id, 'dead')}
+                className="flex items-center gap-1 text-xs text-slate-300 hover:text-slate-500 transition-colors px-1">
+                Mark dead
+              </button>
             )}
           </div>
         </div>
