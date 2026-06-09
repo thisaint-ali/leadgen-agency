@@ -195,7 +195,6 @@ export default function Dashboard({ onNavigate }) {
     count: prospects.filter(p => p.status === id).length,
   }));
 
-  const signedContracts  = contracts.filter(c => c.status === 'signed');
   const pendingContracts = contracts.filter(c => c.status === 'sent');
 
   const lastBotTime = bigBotLast?.created_at
